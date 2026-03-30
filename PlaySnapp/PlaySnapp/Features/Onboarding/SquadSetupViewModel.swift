@@ -58,7 +58,7 @@ final class SquadSetupViewModel: ObservableObject {
 
     func submit(
         squadService: SquadServicing,
-        authService: AuthServicing,
+        progressService: OnboardingProgressServicing,
         router: AppRouter
     ) async {
         guard canSubmit else {
@@ -85,7 +85,7 @@ final class SquadSetupViewModel: ObservableObject {
             }
 
             lastResolvedSquad = squad
-            let session = try await authService.markJoinedSquad()
+            let session = try await progressService.markJoinedSquad()
             router.handleSessionUpdate(session)
         } catch {
             errorMessage = "Could not complete squad setup."

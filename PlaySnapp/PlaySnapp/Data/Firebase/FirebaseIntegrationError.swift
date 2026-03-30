@@ -3,6 +3,7 @@ import Foundation
 enum FirebaseIntegrationError: LocalizedError {
     case sdkUnavailable(product: String)
     case notYetImplemented(feature: String)
+    case signInInProgress
     case missingIdentityToken
     case invalidIdentityToken
     case invalidAppleCredential
@@ -14,6 +15,8 @@ enum FirebaseIntegrationError: LocalizedError {
             return "\(product) is not linked into the project yet."
         case let .notYetImplemented(feature):
             return "\(feature) is prepared in the architecture but not implemented yet."
+        case .signInInProgress:
+            return "Apple sign-in is already in progress."
         case .missingIdentityToken:
             return "Apple sign-in did not return an identity token."
         case .invalidIdentityToken:

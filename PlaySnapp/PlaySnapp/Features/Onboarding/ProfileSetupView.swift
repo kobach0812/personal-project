@@ -22,7 +22,7 @@ struct ProfileSetupView: View {
                     Button("Save and continue") {
                         Task {
                             await viewModel.saveProfile(
-                                authService: environment.authService,
+                                progressService: environment.onboardingProgressService,
                                 router: router
                             )
                         }

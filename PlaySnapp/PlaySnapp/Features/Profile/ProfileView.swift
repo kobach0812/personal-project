@@ -9,9 +9,19 @@ struct ProfileView: View {
         NavigationStack {
             List {
                 Section("Player") {
-                    LabeledContent("Name", value: viewModel.user.name)
-                    LabeledContent("Sport", value: viewModel.user.primarySport.displayName)
+                    LabeledContent("Name", value: viewModel.user?.name ?? "Not set")
+                    LabeledContent("Sport", value: viewModel.user?.primarySport.displayName ?? "Not set")
                     LabeledContent("Squad", value: viewModel.squad?.name ?? "No squad")
+                }
+
+                if viewModel.isLoading {
+                    Section {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    }
                 }
 
                 Section("MVP status") {
@@ -34,7 +44,10 @@ struct ProfileView: View {
             }
             .navigationTitle("Profile")
             .task {
-                await viewModel.load(squadService: environment.squadService)
+                await viewModel.load(
+                    profileService: environment.userProfileService,
+                    squadService: environment.squadService
+                )
             }
         }
     }

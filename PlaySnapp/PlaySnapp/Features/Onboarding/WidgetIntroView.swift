@@ -50,7 +50,7 @@ struct WidgetIntroView: View {
             Button("Continue to app") {
                 Task {
                     await viewModel.finish(
-                        authService: environment.authService,
+                        progressService: environment.onboardingProgressService,
                         router: router
                     )
                 }

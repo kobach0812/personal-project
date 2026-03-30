@@ -28,7 +28,7 @@ struct SquadSetupView: View {
                         Task {
                             await viewModel.submit(
                                 squadService: environment.squadService,
-                                authService: environment.authService,
+                                progressService: environment.onboardingProgressService,
                                 router: router
                             )
                         }

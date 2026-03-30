@@ -9,6 +9,8 @@ enum AppDataSource {
 @MainActor
 final class AppEnvironment: ObservableObject {
     let authService: AuthServicing
+    let onboardingProgressService: OnboardingProgressServicing
+    let userProfileService: UserProfileServicing
     let squadService: SquadServicing
     let playService: PlayServicing
     let storageService: StorageServicing
@@ -17,6 +19,8 @@ final class AppEnvironment: ObservableObject {
 
     init(
         authService: AuthServicing,
+        onboardingProgressService: OnboardingProgressServicing,
+        userProfileService: UserProfileServicing,
         squadService: SquadServicing,
         playService: PlayServicing,
         storageService: StorageServicing,
@@ -24,6 +28,8 @@ final class AppEnvironment: ObservableObject {
         widgetSyncService: WidgetSyncServicing
     ) {
         self.authService = authService
+        self.onboardingProgressService = onboardingProgressService
+        self.userProfileService = userProfileService
         self.squadService = squadService
         self.playService = playService
         self.storageService = storageService
@@ -45,9 +51,13 @@ extension AppEnvironment {
     }
 
     private static func makeDevelopmentEnvironment() -> AppEnvironment {
+        let sessionStore = StubSessionStore()
+
         AppEnvironment(
-            authService: StubAuthService(),
-            squadService: StubSquadService(),
+            authService: StubAuthService(sessionStore: sessionStore),
+            onboardingProgressService: StubOnboardingProgressService(sessionStore: sessionStore),
+            userProfileService: StubUserProfileService(sessionStore: sessionStore),
+            squadService: StubSquadService(sessionStore: sessionStore),
             playService: StubPlayService(),
             storageService: StubStorageService(),
             notificationService: StubNotificationService(),
@@ -56,8 +66,22 @@ extension AppEnvironment {
     }
 
     private static func makeFirebasePreparedEnvironment() -> AppEnvironment {
+        let authGateway = FirebaseAuthGateway()
+        let sessionStore = FirebaseSessionDocumentStore()
+
         AppEnvironment(
-            authService: FirebaseAuthService(),
+            authService: FirebaseAuthService(
+                authGateway: authGateway,
+                sessionStore: sessionStore
+            ),
+            onboardingProgressService: FirebaseOnboardingProgressService(
+                authGateway: authGateway,
+                sessionStore: sessionStore
+            ),
+            userProfileService: FirebaseUserProfileService(
+                authGateway: authGateway,
+                sessionStore: sessionStore
+            ),
             squadService: StubSquadService(),
             playService: StubPlayService(),
             storageService: FirebaseStorageService(),

@@ -6,7 +6,7 @@ final class WidgetIntroViewModel: ObservableObject {
     @Published var isSaving = false
 
     func finish(
-        authService: AuthServicing,
+        progressService: OnboardingProgressServicing,
         router: AppRouter
     ) async {
         isSaving = true
@@ -15,7 +15,7 @@ final class WidgetIntroViewModel: ObservableObject {
         }
 
         do {
-            let session = try await authService.markSeenWidgetIntro()
+            let session = try await progressService.markSeenWidgetIntro()
             router.handleSessionUpdate(session)
         } catch {
             router.openMain()

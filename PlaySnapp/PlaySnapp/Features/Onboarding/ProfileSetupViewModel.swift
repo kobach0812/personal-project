@@ -13,7 +13,7 @@ final class ProfileSetupViewModel: ObservableObject {
     }
 
     func saveProfile(
-        authService: AuthServicing,
+        progressService: OnboardingProgressServicing,
         router: AppRouter
     ) async {
         guard canSubmit else {
@@ -29,7 +29,7 @@ final class ProfileSetupViewModel: ObservableObject {
         }
 
         do {
-            let session = try await authService.completeProfile(
+            let session = try await progressService.completeProfile(
                 name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                 sport: selectedSport
             )
