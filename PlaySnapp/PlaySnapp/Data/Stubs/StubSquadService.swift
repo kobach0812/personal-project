@@ -1,11 +1,5 @@
 import Foundation
 
-protocol SquadServicing {
-    func createSquad(name: String, sport: Sport) async throws -> Squad
-    func joinSquad(inviteCode: String) async throws -> Squad
-    func fetchCurrentSquad() async throws -> Squad?
-}
-
 actor StubSquadService: SquadServicing {
     private var currentSquad: Squad?
 
@@ -14,7 +8,7 @@ actor StubSquadService: SquadServicing {
             id: UUID().uuidString,
             name: name,
             sport: sport,
-            memberIDs: [AppUser.sample.id],
+            memberIDs: [AppFixtures.sampleUser.id],
             inviteCode: String(name.prefix(4)).uppercased() + "1",
             createdAt: .now
         )
@@ -38,6 +32,6 @@ actor StubSquadService: SquadServicing {
     }
 
     func fetchCurrentSquad() async throws -> Squad? {
-        currentSquad ?? .sample
+        currentSquad ?? AppFixtures.sampleSquad
     }
 }

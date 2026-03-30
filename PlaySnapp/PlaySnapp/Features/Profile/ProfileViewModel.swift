@@ -3,7 +3,7 @@ import Foundation
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
-    @Published var user = AppUser.sample
+    @Published var user = AppFixtures.sampleUser
     @Published var squad: Squad?
 
     func load(squadService: SquadServicing) async {

@@ -27,6 +27,20 @@ Core technologies:
 - `Firebase Cloud Messaging` for push
 - `App Groups` for local app-to-widget shared data
 
+### Maintainability rules
+
+From this point forward, the codebase should follow these non-negotiable rules:
+
+- `Domain` owns models and protocol contracts
+- `Data` owns concrete implementations for Firebase, local persistence, and stubbed development data
+- `PreviewSupport` owns sample fixtures and preview-only data
+- `Features` own screens and view models only
+- Views never talk directly to Firebase, camera, storage, or widget APIs
+- Only UI-facing types should be `@MainActor`
+- Project-wide default actor isolation must stay off
+- New integrations should be added behind protocol boundaries first, then wired into the environment container
+- Shared cross-target code must stay small and explicit
+
 ## 3. Important design corrections
 
 Your proposed direction is good, but these changes matter:
@@ -50,7 +64,7 @@ Your proposed direction is good, but these changes matter:
 
 ## 4. Recommended project structure
 
-Your proposed structure is workable for MVP. I would tighten it slightly like this:
+The maintainable base structure should look like this:
 
 ```text
 PlaySnap/
@@ -58,6 +72,35 @@ PlaySnap/
 │   ├── PlaySnapApp.swift
 │   ├── AppRouter.swift
 │   └── AppEnvironment.swift
+├── Domain/
+│   ├── Models/
+│   │   ├── Play.swift
+│   │   ├── PlayReaction.swift
+│   │   ├── Squad.swift
+│   │   ├── AppUser.swift
+│   │   ├── DeviceRegistration.swift
+│   │   └── AppNotification.swift
+│   └── Services/
+│       ├── AuthService.swift
+│       ├── PlayService.swift
+│       ├── SquadService.swift
+│       ├── StorageService.swift
+│       ├── NotificationService.swift
+│       └── WidgetSyncService.swift
+├── Data/
+│   ├── Firebase/
+│   │   ├── FirebaseConfiguration.swift
+│   │   ├── FirestorePaths.swift
+│   │   ├── FirebaseAuthService.swift
+│   │   └── FirebaseStorageService.swift
+│   ├── Local/
+│   │   └── LocalWidgetSyncService.swift
+│   └── Stubs/
+│       ├── StubAuthService.swift
+│       ├── StubPlayService.swift
+│       ├── StubSquadService.swift
+│       ├── StubStorageService.swift
+│       └── StubNotificationService.swift
 ├── Features/
 │   ├── Auth/
 │   │   ├── AuthView.swift
@@ -81,26 +124,12 @@ PlaySnap/
 │   └── Profile/
 │       ├── ProfileView.swift
 │       └── ProfileViewModel.swift
-├── Models/
-│   ├── Play.swift
-│   ├── PlayReaction.swift
-│   ├── Squad.swift
-│   ├── AppUser.swift
-│   ├── DeviceRegistration.swift
-│   └── AppNotification.swift
-├── Services/
-│   ├── AuthService.swift
-│   ├── PlayService.swift
-│   ├── SquadService.swift
-│   ├── StorageService.swift
-│   ├── NotificationService.swift
-│   └── WidgetSyncService.swift
 ├── Infrastructure/
-│   ├── Firebase/
-│   │   ├── FirestorePaths.swift
-│   │   └── FirebaseConfiguration.swift
 │   └── Camera/
 │       └── CameraManager.swift
+├── PreviewSupport/
+│   └── Fixtures/
+│       └── AppFixtures.swift
 ├── Shared/
 │   ├── Utilities/
 │   │   ├── ImageCompressor.swift
@@ -117,9 +146,10 @@ PlaySnap/
 
 Notes:
 
-- `OnboardingView.swift` should not stay as one large file for long
+- `Domain` must not import Firebase or WidgetKit
+- `Data` may import Firebase, WidgetKit, or storage SDKs
+- `PreviewSupport` must not leak into production persistence code
 - `Utilities/` should stay small or it becomes a junk drawer
-- `WidgetSyncService` should own all app-to-widget cache writes
 
 ## 5. Runtime architecture
 
@@ -129,17 +159,19 @@ The app should be separated into these responsibilities:
   - SwiftUI views and navigation
 - View model layer
   - screen state and async orchestration
-- Service layer
-  - Firebase, media upload, widget sync, notifications
+- Domain layer
+  - business entities and service contracts
+- Data layer
+  - Firebase, local widget sync, and stub implementations
 - Infrastructure layer
-  - low-level camera and Firebase wrappers
+  - low-level camera wrappers and platform adapters
 
 Preferred rule:
 
 - Views do not talk directly to Firebase
 - Views call view models
-- View models call services
-- Services own side effects
+- View models call domain service contracts
+- Data implementations own side effects
 
 ## 6. Data model
 

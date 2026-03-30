@@ -1,6 +1,11 @@
 import Combine
 import Foundation
 
+enum AppDataSource {
+    case development
+    case firebasePrepared
+}
+
 @MainActor
 final class AppEnvironment: ObservableObject {
     let authService: AuthServicing
@@ -25,22 +30,39 @@ final class AppEnvironment: ObservableObject {
         self.notificationService = notificationService
         self.widgetSyncService = widgetSyncService
     }
+}
 
-    static func bootstrap() -> AppEnvironment {
-        let authService = StubAuthService()
-        let squadService = StubSquadService()
-        let playService = StubPlayService()
-        let storageService = StubStorageService()
-        let notificationService = StubNotificationService()
-        let widgetSyncService = StubWidgetSyncService()
+extension AppEnvironment {
+    static func bootstrap(dataSource: AppDataSource = .development) -> AppEnvironment {
+        FirebaseConfiguration.configure()
 
-        return AppEnvironment(
-            authService: authService,
-            squadService: squadService,
-            playService: playService,
-            storageService: storageService,
-            notificationService: notificationService,
-            widgetSyncService: widgetSyncService
+        switch dataSource {
+        case .development:
+            return makeDevelopmentEnvironment()
+        case .firebasePrepared:
+            return makeFirebasePreparedEnvironment()
+        }
+    }
+
+    private static func makeDevelopmentEnvironment() -> AppEnvironment {
+        AppEnvironment(
+            authService: StubAuthService(),
+            squadService: StubSquadService(),
+            playService: StubPlayService(),
+            storageService: StubStorageService(),
+            notificationService: StubNotificationService(),
+            widgetSyncService: LocalWidgetSyncService()
+        )
+    }
+
+    private static func makeFirebasePreparedEnvironment() -> AppEnvironment {
+        AppEnvironment(
+            authService: FirebaseAuthService(),
+            squadService: StubSquadService(),
+            playService: StubPlayService(),
+            storageService: FirebaseStorageService(),
+            notificationService: StubNotificationService(),
+            widgetSyncService: LocalWidgetSyncService()
         )
     }
 }

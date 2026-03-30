@@ -1,35 +1,32 @@
 # Xcode Setup
 
-This repo now contains the app source scaffold, but it does not yet contain a generated `.xcodeproj`.
+This repo now contains a generated Xcode project at [PlaySnapp.xcodeproj](/Users/andythang/personal-project/PlaySnapp/PlaySnapp.xcodeproj).
 
-## 1. Create the app project
+## 1. Open the existing app project
 
 1. Open Xcode.
-2. Create a new `iOS App` project named `PlaySnap`.
-3. Use `SwiftUI` for the interface.
-4. Use `Swift` as the language.
-5. Save the project in `/Users/andythang/personal-project`.
+2. Open [PlaySnapp.xcodeproj](/Users/andythang/personal-project/PlaySnapp/PlaySnapp.xcodeproj).
 
 ## 2. Add the existing source folders
 
-After the project is created:
+The app source already lives in:
 
-1. Delete the default generated view files if you do not need them.
-2. Add the `/Users/andythang/personal-project/PlaySnap` folder to the app target.
-3. Add the `/Users/andythang/personal-project/WidgetExtension` folder to the widget target.
+- `/Users/andythang/personal-project/PlaySnapp/PlaySnapp`
+- `/Users/andythang/personal-project/PlaySnapp/WidgetExtension`
 
-Use:
+The project is using filesystem-synchronized groups, so new folders added under the app root are picked up automatically.
 
-- "Create groups" if you want a cleaner navigator
-- or "Create folder references" only if you prefer filesystem mirroring
+## 3. Check the widget target
 
-For most teams, `Create groups` is the better choice.
+This project already contains a widget target: `WidgetExtensionExtension`.
 
-## 3. Add the widget target
+You do not need to create another widget target unless you intentionally want to rename or rebuild it.
 
-1. In Xcode, add a new `Widget Extension` target named `PlaySnapWidgetExtension`.
-2. Point that target at the files inside `/Users/andythang/personal-project/WidgetExtension`.
-3. Include `/Users/andythang/personal-project/PlaySnap/Shared/Widget/AppGroupStore.swift` in both the app target and the widget target.
+Verify this instead:
+
+1. The widget target still points at the files inside `/Users/andythang/personal-project/PlaySnapp/WidgetExtension`.
+2. `/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Shared/Widget/AppGroupStore.swift` is included in both the app target and the widget target.
+3. `PlaySnapWidget.swift` is the only widget entry file in the widget target.
 
 ## 4. Add capabilities
 
@@ -73,17 +70,18 @@ Then:
 
 After Firebase packages are installed:
 
-1. Import `FirebaseCore` in [FirebaseConfiguration.swift](/Users/andythang/personal-project/PlaySnap/Infrastructure/Firebase/FirebaseConfiguration.swift).
-2. Call `FirebaseApp.configure()`.
-3. Call `FirebaseConfiguration.configure()` from [PlaySnapApp.swift](/Users/andythang/personal-project/PlaySnap/App/PlaySnapApp.swift).
+1. Verify [FirebaseConfiguration.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseConfiguration.swift) can import `FirebaseCore`.
+2. Keep `FirebaseConfiguration.configure()` as the single app bootstrap point.
+3. Let [PlaySnapApp.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/App/PlaySnapApp.swift) call the environment bootstrap only.
 
 ## 7. First milestone target
 
 Once the project opens successfully, the first implementation target should be:
 
-1. Replace `StubAuthService` with Firebase Auth
-2. Persist the current user to Firestore
-3. Complete the profile flow
+1. Replace [StubAuthService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Stubs/StubAuthService.swift) with [FirebaseAuthService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseAuthService.swift)
+2. Replace [StubStorageService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Stubs/StubStorageService.swift) with [FirebaseStorageService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseStorageService.swift)
+3. Persist the current user profile to Firestore
+4. Complete the profile flow
 
 ## 8. Current scaffold
 
@@ -91,8 +89,24 @@ The repo already includes:
 
 - App router and app shell
 - Auth, onboarding, feed, notifications, and profile screens
-- Core models and service interfaces
+- `Domain` contracts and models
+- `Data` implementations for stubs, local widget sync, and Firebase-ready auth/storage
+- `PreviewSupport` fixtures separated from production models
 - Widget storage and widget placeholder files
 - Firebase path helpers and camera permission placeholder
 
-The next coding step after opening in Xcode is to wire Milestone 1, not to redesign the structure again.
+The next coding step after opening in Xcode is to wire Milestone 1 against the `Domain -> Data` boundaries, not to redesign the structure again.
+
+## 9. Immediate next actions
+
+Based on the current repo state, do these next in order:
+
+1. Add capabilities in Xcode for the app target and widget target.
+2. Create the shared `App Groups` ID: `group.com.playsnap.shared`.
+3. Add the Firebase packages.
+4. Add `GoogleService-Info.plist` to the app target.
+5. Keep the app on `.development` until packages are installed and the Firebase files compile cleanly.
+6. Then switch [PlaySnapApp.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/App/PlaySnapApp.swift) from `.development` to `.firebasePrepared`.
+7. Implement `FirebaseAuthService` first, then `FirebaseStorageService`, then Firestore profile persistence.
+
+Right now, the repo does not yet contain any `.entitlements` files or `GoogleService-Info.plist`, so capabilities and Firebase setup are the real next step.

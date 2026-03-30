@@ -4,11 +4,7 @@ import Foundation
 import WidgetKit
 #endif
 
-protocol WidgetSyncServicing {
-    func storeLatestPlay(_ play: WidgetPayload) async
-}
-
-actor StubWidgetSyncService: WidgetSyncServicing {
+actor LocalWidgetSyncService: WidgetSyncServicing {
     func storeLatestPlay(_ play: WidgetPayload) async {
         AppGroupStore.save(play)
 

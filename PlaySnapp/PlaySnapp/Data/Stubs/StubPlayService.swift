@@ -1,12 +1,7 @@
 import Foundation
 
-protocol PlayServicing {
-    func fetchFeed() async throws -> [Play]
-    func toggleReaction(for playID: String, emoji: String) async throws -> [Play]
-}
-
 actor StubPlayService: PlayServicing {
-    private var plays = Play.samples
+    private var plays = AppFixtures.samplePlays
 
     func fetchFeed() async throws -> [Play] {
         plays.sorted(by: { $0.createdAt > $1.createdAt })

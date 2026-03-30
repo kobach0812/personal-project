@@ -40,15 +40,3 @@ struct AppUser: Identifiable, Codable, Equatable, Sendable {
     let createdAt: Date
     var updatedAt: Date
 }
-
-extension AppUser {
-    nonisolated static let sample = AppUser(
-        id: "user-1",
-        name: "Alex Carter",
-        primarySport: .football,
-        avatarURL: nil,
-        squadID: "squad-1",
-        createdAt: .now,
-        updatedAt: .now
-    )
-}
