@@ -122,6 +122,12 @@ extension AppleSignInProvider: ASAuthorizationControllerPresentationContextProvi
             return firstWindow
         }
 
+        if let activeScene = windowScenes.first(where: { $0.activationState == .foregroundActive })
+            ?? windowScenes.first
+        {
+            return UIWindow(windowScene: activeScene)
+        }
+
         preconditionFailure("Apple sign-in requires an active window scene.")
         #else
         preconditionFailure("Apple sign-in requires a UIKit presentation anchor.")
