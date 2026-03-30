@@ -47,6 +47,81 @@ actor FirebaseAuthGateway {
         #endif
     }
 
+    #if canImport(FirebaseAuth)
+    func signIn(email: String, password: String) async throws -> FirebaseAuthenticatedUser {
+        let result: AuthDataResult = try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<AuthDataResult, Error>) in
+            Auth.auth().signIn(withEmail: email, password: password) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let result else {
+                    continuation.resume(throwing: FirebaseIntegrationError.missingAuthResult)
+                    return
+                }
+
+                continuation.resume(returning: result)
+            }
+        }
+
+        return map(result.user)
+    }
+
+    func createUser(email: String, password: String) async throws -> FirebaseAuthenticatedUser {
+        let result: AuthDataResult = try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<AuthDataResult, Error>) in
+            Auth.auth().createUser(withEmail: email, password: password) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let result else {
+                    continuation.resume(throwing: FirebaseIntegrationError.missingAuthResult)
+                    return
+                }
+
+                continuation.resume(returning: result)
+            }
+        }
+
+        return map(result.user)
+    }
+
+    func sendPhoneVerificationCode(to phoneNumber: String) async throws -> String {
+        try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<String, Error>) in
+            PhoneAuthProvider.provider().verifyPhoneNumber(phoneNumber, uiDelegate: nil) {
+                verificationID, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let verificationID else {
+                    continuation.resume(throwing: FirebaseIntegrationError.missingVerificationID)
+                    return
+                }
+
+                continuation.resume(returning: verificationID)
+            }
+        }
+    }
+
+    func signIn(
+        verificationID: String,
+        verificationCode: String
+    ) async throws -> FirebaseAuthenticatedUser {
+        let credential = PhoneAuthProvider.provider().credential(
+            withVerificationID: verificationID,
+            verificationCode: verificationCode
+        )
+        return try await signIn(with: credential)
+    }
+    #endif
+
     func signOut() throws {
         #if canImport(FirebaseAuth)
         try Auth.auth().signOut()

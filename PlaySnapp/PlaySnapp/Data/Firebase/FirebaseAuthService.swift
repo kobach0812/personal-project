@@ -24,19 +24,42 @@ actor FirebaseAuthService: AuthServicing {
         return try await sessionStore.fetchOrCreateSession(for: currentUser)
     }
 
-    func signInWithApple() async throws -> AppSession {
+    func signIn(email: String, password: String) async throws -> AppSession {
         #if canImport(FirebaseAuth)
-        let appleSignIn = try await startAppleSignIn()
-        let credential = OAuthProvider.appleCredential(
-            withIDToken: appleSignIn.idToken,
-            rawNonce: appleSignIn.rawNonce,
-            fullName: nil
+        let user = try await authGateway.signIn(email: email, password: password)
+        return try await sessionStore.fetchOrCreateSession(for: user, preferredName: user.displayName)
+        #else
+        throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseAuth")
+        #endif
+    }
+
+    func register(email: String, password: String) async throws -> AppSession {
+        #if canImport(FirebaseAuth)
+        let user = try await authGateway.createUser(email: email, password: password)
+        return try await sessionStore.fetchOrCreateSession(for: user, preferredName: user.displayName)
+        #else
+        throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseAuth")
+        #endif
+    }
+
+    func sendPhoneVerificationCode(to phoneNumber: String) async throws -> String {
+        #if canImport(FirebaseAuth)
+        return try await authGateway.sendPhoneVerificationCode(to: phoneNumber)
+        #else
+        throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseAuth")
+        #endif
+    }
+
+    func verifyPhoneNumber(
+        code: String,
+        verificationID: String
+    ) async throws -> AppSession {
+        #if canImport(FirebaseAuth)
+        let user = try await authGateway.signIn(
+            verificationID: verificationID,
+            verificationCode: code
         )
-        let user = try await authGateway.signIn(with: credential)
-        return try await sessionStore.fetchOrCreateSession(
-            for: user,
-            preferredName: appleSignIn.preferredName
-        )
+        return try await sessionStore.fetchOrCreateSession(for: user, preferredName: user.displayName)
         #else
         throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseAuth")
         #endif
@@ -44,13 +67,5 @@ actor FirebaseAuthService: AuthServicing {
 
     func signOut() async throws {
         try await authGateway.signOut()
-    }
-}
-
-private extension FirebaseAuthService {
-    @MainActor
-    func startAppleSignIn() async throws -> AppleSignInResult {
-        let provider = AppleSignInProvider()
-        return try await provider.start()
     }
 }

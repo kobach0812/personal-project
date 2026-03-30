@@ -3,35 +3,52 @@ import Foundation
 actor StubSessionStore {
     private var session: AppSession?
     private var currentUser: AppUser?
+    private var emailPasswords: [String: String] = [:]
+    private var userIDsByIdentity: [String: String] = [:]
+    private var pendingPhoneNumbersByVerificationID: [String: String] = [:]
+    private let phoneVerificationCode = "123456"
 
     func restoreSession() -> AppSession? {
         session
     }
 
-    func signIn() -> AppSession {
-        let userID = currentUser?.id ?? UUID().uuidString
-        let now = Date()
-
-        if currentUser == nil {
-            currentUser = AppUser(
-                id: userID,
-                name: "",
-                primarySport: .football,
-                avatarURL: nil,
-                squadID: nil,
-                createdAt: now,
-                updatedAt: now
-            )
+    func signIn(email: String, password: String) throws -> AppSession {
+        let normalizedEmail = normalizeEmail(email)
+        guard emailPasswords[normalizedEmail] == password else {
+            throw AuthServiceError.invalidCredentials
         }
 
-        let nextSession = AppSession(
-            userID: userID,
-            hasCompletedProfile: false,
-            hasJoinedSquad: false,
-            hasSeenWidgetIntro: false
-        )
-        session = nextSession
-        return nextSession
+        return activateSession(forIdentity: normalizedEmail)
+    }
+
+    func register(email: String, password: String) throws -> AppSession {
+        let normalizedEmail = normalizeEmail(email)
+        guard emailPasswords[normalizedEmail] == nil else {
+            throw AuthServiceError.accountAlreadyExists
+        }
+
+        emailPasswords[normalizedEmail] = password
+        return activateSession(forIdentity: normalizedEmail)
+    }
+
+    func sendPhoneVerificationCode(to phoneNumber: String) -> String {
+        let verificationID = UUID().uuidString
+        pendingPhoneNumbersByVerificationID[verificationID] = normalizePhoneNumber(phoneNumber)
+        return verificationID
+    }
+
+    func verifyPhoneNumber(code: String, verificationID: String) throws -> AppSession {
+        guard code == phoneVerificationCode else {
+            throw AuthServiceError.invalidVerificationCode
+        }
+
+        guard let phoneNumber = pendingPhoneNumbersByVerificationID.removeValue(
+            forKey: verificationID
+        ) else {
+            throw AuthServiceError.missingPhoneVerification
+        }
+
+        return activateSession(forIdentity: phoneNumber)
     }
 
     func signOut() {
@@ -97,5 +114,42 @@ actor StubSessionStore {
 
     func currentUserID() -> String? {
         currentUser?.id ?? session?.userID
+    }
+}
+
+private extension StubSessionStore {
+    func activateSession(forIdentity identity: String) -> AppSession {
+        let userID = userIDsByIdentity[identity] ?? UUID().uuidString
+        let now = Date()
+
+        userIDsByIdentity[identity] = userID
+
+        let existingUser = currentUser?.id == userID ? currentUser : nil
+        currentUser = AppUser(
+            id: userID,
+            name: existingUser?.name ?? "",
+            primarySport: existingUser?.primarySport ?? .football,
+            avatarURL: existingUser?.avatarURL,
+            squadID: existingUser?.squadID,
+            createdAt: existingUser?.createdAt ?? now,
+            updatedAt: now
+        )
+
+        let nextSession = AppSession(
+            userID: userID,
+            hasCompletedProfile: false,
+            hasJoinedSquad: false,
+            hasSeenWidgetIntro: false
+        )
+        session = nextSession
+        return nextSession
+    }
+
+    func normalizeEmail(_ email: String) -> String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    func normalizePhoneNumber(_ phoneNumber: String) -> String {
+        phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

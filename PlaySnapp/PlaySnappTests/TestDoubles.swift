@@ -34,7 +34,19 @@ actor AuthServiceStub: AuthServicing {
         return restoredSession
     }
 
-    func signInWithApple() async throws -> AppSession {
+    func signIn(email: String, password: String) async throws -> AppSession {
+        makeSession(hasCompletedProfile: false, hasJoinedSquad: false, hasSeenWidgetIntro: false)
+    }
+
+    func register(email: String, password: String) async throws -> AppSession {
+        makeSession(hasCompletedProfile: false, hasJoinedSquad: false, hasSeenWidgetIntro: false)
+    }
+
+    func sendPhoneVerificationCode(to phoneNumber: String) async throws -> String {
+        "test-verification-id"
+    }
+
+    func verifyPhoneNumber(code: String, verificationID: String) async throws -> AppSession {
         makeSession(hasCompletedProfile: false, hasJoinedSquad: false, hasSeenWidgetIntro: false)
     }
 

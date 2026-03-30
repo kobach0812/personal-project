@@ -8,6 +8,7 @@ enum FirebaseIntegrationError: LocalizedError {
     case invalidIdentityToken
     case invalidAppleCredential
     case missingAuthResult
+    case missingVerificationID
 
     var errorDescription: String? {
         switch self {
@@ -25,6 +26,8 @@ enum FirebaseIntegrationError: LocalizedError {
             return "Apple sign-in returned an unexpected credential type."
         case .missingAuthResult:
             return "Firebase Auth did not return a user session."
+        case .missingVerificationID:
+            return "Firebase Phone Auth did not return a verification ID."
         }
     }
 }
