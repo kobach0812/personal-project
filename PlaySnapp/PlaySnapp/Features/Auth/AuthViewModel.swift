@@ -21,7 +21,7 @@ final class AuthViewModel: ObservableObject {
             let session = try await authService.signInWithApple()
             router.handleSessionUpdate(session)
         } catch {
-            errorMessage = "Sign in failed. Wire this screen to Firebase Auth next."
+            errorMessage = error.localizedDescription
         }
     }
 }

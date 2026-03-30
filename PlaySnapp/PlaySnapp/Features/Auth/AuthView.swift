@@ -42,7 +42,7 @@ struct AuthView: View {
                     .foregroundStyle(.red)
             }
 
-            Text("Firebase auth and Apple capability will be wired in during Milestone 1.")
+            Text("Continue with Apple now uses Firebase Auth. If it fails, check Firebase Apple provider setup and Xcode signing.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 

@@ -78,9 +78,9 @@ After Firebase packages are installed:
 
 Once the project opens successfully, the first implementation target should be:
 
-1. Replace [StubAuthService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Stubs/StubAuthService.swift) with [FirebaseAuthService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseAuthService.swift)
+1. Verify [FirebaseAuthService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseAuthService.swift) can complete real Apple sign-in and restore a Firebase-backed session
 2. Replace [StubStorageService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Stubs/StubStorageService.swift) with [FirebaseStorageService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseStorageService.swift)
-3. Persist the current user profile to Firestore
+3. Persist the current user profile and session flags to Firestore
 4. Complete the profile flow
 
 ## 8. Current scaffold
@@ -90,7 +90,7 @@ The repo already includes:
 - App router and app shell
 - Auth, onboarding, feed, notifications, and profile screens
 - `Domain` contracts and models
-- `Data` implementations for stubs, local widget sync, and Firebase-ready auth/storage
+- `Data` implementations for stubs, local widget sync, and Firebase-backed auth bootstrap
 - `PreviewSupport` fixtures separated from production models
 - Widget storage and widget placeholder files
 - Firebase path helpers and camera permission placeholder
@@ -105,8 +105,12 @@ Based on the current repo state, do these next in order:
 2. Create the shared `App Groups` ID: `group.com.playsnap.shared`.
 3. Add the Firebase packages.
 4. Add `GoogleService-Info.plist` to the app target.
-5. Keep the app on `.development` until packages are installed and the Firebase files compile cleanly.
-6. Then switch [PlaySnapApp.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/App/PlaySnapApp.swift) from `.development` to `.firebasePrepared`.
-7. Implement `FirebaseAuthService` first, then `FirebaseStorageService`, then Firestore profile persistence.
+5. Confirm [PlaySnapApp.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/App/PlaySnapApp.swift) is running in `.firebasePrepared`.
+6. In Firebase Console, enable the Apple auth provider and create the Firestore database.
+7. Verify sign-in works, then implement [FirebaseStorageService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseStorageService.swift).
 
-Right now, the repo does not yet contain any `.entitlements` files or `GoogleService-Info.plist`, so capabilities and Firebase setup are the real next step.
+Right now, the remaining setup gaps are external configuration:
+
+- no `.entitlements` files are committed yet for App Groups
+- Apple auth still depends on Firebase Console provider setup
+- Firestore must exist in the Firebase project before the profile/session flow can persist data

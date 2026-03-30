@@ -12,6 +12,10 @@ enum FirebaseConfiguration {
         }
 
         FirebaseApp.configure()
+        assert(
+            FirebaseApp.app() != nil,
+            "Firebase failed to initialize. Check GoogleService-Info.plist target membership."
+        )
         #endif
     }
 }

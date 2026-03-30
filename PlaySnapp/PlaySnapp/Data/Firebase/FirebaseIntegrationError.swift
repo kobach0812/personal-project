@@ -3,6 +3,10 @@ import Foundation
 enum FirebaseIntegrationError: LocalizedError {
     case sdkUnavailable(product: String)
     case notYetImplemented(feature: String)
+    case missingIdentityToken
+    case invalidIdentityToken
+    case invalidAppleCredential
+    case missingAuthResult
 
     var errorDescription: String? {
         switch self {
@@ -10,6 +14,14 @@ enum FirebaseIntegrationError: LocalizedError {
             return "\(product) is not linked into the project yet."
         case let .notYetImplemented(feature):
             return "\(feature) is prepared in the architecture but not implemented yet."
+        case .missingIdentityToken:
+            return "Apple sign-in did not return an identity token."
+        case .invalidIdentityToken:
+            return "Apple sign-in returned an invalid identity token."
+        case .invalidAppleCredential:
+            return "Apple sign-in returned an unexpected credential type."
+        case .missingAuthResult:
+            return "Firebase Auth did not return a user session."
         }
     }
 }

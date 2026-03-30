@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct PlaySnapApp: App {
     @StateObject private var router = AppRouter()
-    @StateObject private var environment = AppEnvironment.bootstrap(dataSource: .development)
+    @StateObject private var environment = AppEnvironment.bootstrap(dataSource: .firebasePrepared)
 
     var body: some Scene {
         WindowGroup {
