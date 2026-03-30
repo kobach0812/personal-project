@@ -11,15 +11,24 @@ enum VideoThumbnailGenerator {
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
 
-        do {
-            let image = try generator.copyCGImage(at: .zero, actualTime: nil)
+        let semaphore = DispatchSemaphore(value: 0)
+        var thumbnailData: Data?
+
+        generator.generateCGImagesAsynchronously(forTimes: [NSValue(time: .zero)]) { _, image, _, result, _ in
+            defer {
+                semaphore.signal()
+            }
+
+            guard result == .succeeded, let image else {
+                return
+            }
+
             #if canImport(UIKit)
-            return UIImage(cgImage: image).jpegData(compressionQuality: 0.7)
-            #else
-            return nil
+            thumbnailData = UIImage(cgImage: image).jpegData(compressionQuality: 0.7)
             #endif
-        } catch {
-            return nil
         }
+
+        _ = semaphore.wait(timeout: .now() + 5)
+        return thumbnailData
     }
 }

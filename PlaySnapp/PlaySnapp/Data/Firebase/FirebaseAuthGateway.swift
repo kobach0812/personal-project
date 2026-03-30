@@ -57,7 +57,8 @@ actor FirebaseAuthGateway {
 
     #if canImport(FirebaseAuth)
     func signIn(with credential: AuthCredential) async throws -> FirebaseAuthenticatedUser {
-        let result = try await withCheckedThrowingContinuation { continuation in
+        let result: AuthDataResult = try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<AuthDataResult, Error>) in
             Auth.auth().signIn(with: credential) { result, error in
                 if let error {
                     continuation.resume(throwing: error)

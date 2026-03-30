@@ -111,12 +111,20 @@ extension AppleSignInProvider: ASAuthorizationControllerDelegate {
 extension AppleSignInProvider: ASAuthorizationControllerPresentationContextProviding {
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         #if canImport(UIKit)
-        return UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first(where: \.isKeyWindow) ?? UIWindow(frame: .zero)
+        let windowScenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let windows = windowScenes.flatMap(\.windows)
+
+        if let keyWindow = windows.first(where: \.isKeyWindow) {
+            return keyWindow
+        }
+
+        if let firstWindow = windows.first {
+            return firstWindow
+        }
+
+        preconditionFailure("Apple sign-in requires an active window scene.")
         #else
-        return ASPresentationAnchor()
+        preconditionFailure("Apple sign-in requires a UIKit presentation anchor.")
         #endif
     }
 }

@@ -53,7 +53,7 @@ extension AppEnvironment {
     private static func makeDevelopmentEnvironment() -> AppEnvironment {
         let sessionStore = StubSessionStore()
 
-        AppEnvironment(
+        return AppEnvironment(
             authService: StubAuthService(sessionStore: sessionStore),
             onboardingProgressService: StubOnboardingProgressService(sessionStore: sessionStore),
             userProfileService: StubUserProfileService(sessionStore: sessionStore),
@@ -69,7 +69,7 @@ extension AppEnvironment {
         let authGateway = FirebaseAuthGateway()
         let sessionStore = FirebaseSessionDocumentStore()
 
-        AppEnvironment(
+        return AppEnvironment(
             authService: FirebaseAuthService(
                 authGateway: authGateway,
                 sessionStore: sessionStore

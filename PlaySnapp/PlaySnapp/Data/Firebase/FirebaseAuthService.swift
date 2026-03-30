@@ -7,17 +7,13 @@ import FirebaseAuth
 actor FirebaseAuthService: AuthServicing {
     private let authGateway: FirebaseAuthGateway
     private let sessionStore: FirebaseSessionDocumentStore
-    @MainActor private let appleSignInProvider: any AppleSignInProviding
 
-    @MainActor
     init(
         authGateway: FirebaseAuthGateway = FirebaseAuthGateway(),
-        sessionStore: FirebaseSessionDocumentStore = FirebaseSessionDocumentStore(),
-        appleSignInProvider: any AppleSignInProviding = AppleSignInProvider()
+        sessionStore: FirebaseSessionDocumentStore = FirebaseSessionDocumentStore()
     ) {
         self.authGateway = authGateway
         self.sessionStore = sessionStore
-        self.appleSignInProvider = appleSignInProvider
     }
 
     func restoreSession() async throws -> AppSession? {
@@ -30,7 +26,7 @@ actor FirebaseAuthService: AuthServicing {
 
     func signInWithApple() async throws -> AppSession {
         #if canImport(FirebaseAuth)
-        let appleSignIn = try await appleSignInProvider.start()
+        let appleSignIn = try await startAppleSignIn()
         let credential = OAuthProvider.appleCredential(
             withIDToken: appleSignIn.idToken,
             rawNonce: appleSignIn.rawNonce,
@@ -48,5 +44,13 @@ actor FirebaseAuthService: AuthServicing {
 
     func signOut() async throws {
         try await authGateway.signOut()
+    }
+}
+
+private extension FirebaseAuthService {
+    @MainActor
+    func startAppleSignIn() async throws -> AppleSignInResult {
+        let provider = AppleSignInProvider()
+        return try await provider.start()
     }
 }
