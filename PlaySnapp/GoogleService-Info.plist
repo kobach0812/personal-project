@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>test.andythang.PlaySnapp</string>
+	<string>com.andythang.PlaySnapp</string>
 	<key>PROJECT_ID</key>
 	<string>playsnapp-f2d99</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:408152557301:ios:ce5f366cef76bc194127bc</string>
+	<string>1:408152557301:ios:885e3cb209f957b94127bc</string>
 </dict>
 </plist>
