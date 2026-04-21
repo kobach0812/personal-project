@@ -92,8 +92,10 @@ actor FirebasePlayService: PlayServicing {
 
         try await playRef.updateData(["reactions": reactions])
 
-        return play(from: data, playID: playID, squadID: squadID, currentUserID: user.id, reactions: reactions)
-            ?? { throw PlayServiceError.notFound }()
+        guard let updated = play(from: data, playID: playID, squadID: squadID, currentUserID: user.id, reactions: reactions) else {
+            throw PlayServiceError.notFound
+        }
+        return updated
         #else
         throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseFirestore")
         #endif

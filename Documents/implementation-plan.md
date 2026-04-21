@@ -94,97 +94,96 @@ Done when:
 - ✅ Another user can join with invite code
 - ✅ Both users are members of the same squad in Firestore
 
-### Milestone 3: Photo capture and upload 🔄 IN PROGRESS
+### Milestone 3: Photo capture and upload ✅ COMPLETE
 
 Goal:
 - Make the camera usable and upload a photo end to end
 
 Tasks:
-- Build camera screen with AVFoundation live preview
-- Implement camera permissions flow
-- Capture photo
-- Compress image
-- Upload to Firebase Storage (`squads/{squadID}/plays/{playID}/original.jpg`)
-- Create `Play` document in Firestore
-- Return success state to UI
-- Handle upload failure and retry UI
+- ✅ Build camera screen with AVFoundation live preview (`CameraPreviewView` UIViewRepresentable)
+- ✅ Implement camera permissions flow (`CameraManager` + `NSCameraUsageDescription`)
+- ✅ Capture photo (`AVCapturePhotoOutput` + `PhotoCaptureDelegate`)
+- ✅ Compress image (`ImageCompressor.jpegData`)
+- ✅ Upload to Firebase Storage (`squads/{squadID}/plays/{playID}/original.jpg`)
+- ✅ Create `Play` document in Firestore (`FirebasePlayService.postPlay`)
+- ✅ Return success state to UI (dismiss `CapturePreviewView` on post)
+- ✅ Handle upload failure and retry UI (error message shown in `CapturePreviewView`)
 
 Done when:
-- User can open camera immediately after onboarding
-- User can capture and send a photo
-- Photo appears in Storage and Firestore
+- ✅ User can open camera immediately after onboarding
+- ✅ User can capture and send a photo
+- Photo appears in Storage and Firestore (requires Firebase Storage rules update)
 
-### Milestone 4: Feed and play detail
+### Milestone 4: Feed and play detail ✅ COMPLETE
 
 Goal:
 - Let squad members see uploaded plays
 
 Tasks:
-- Build feed screen
-- Subscribe to squad plays in reverse chronological order
-- Build play card UI
-- Build full-screen play detail view
-- Display image thumbnail and metadata
-- Add empty state for new squad
-- Add loading and error states
+- ✅ Build feed screen
+- ✅ Subscribe to squad plays in reverse chronological order (`FirebasePlayService.fetchFeed`)
+- ✅ Build play card UI with `AsyncImage`
+- ✅ Build full-screen play detail view with `AsyncImage`
+- ✅ Display image and metadata
+- ✅ Add empty state for new squad
+- ✅ Add loading and error states
+- ✅ Auto-refresh on tab switch (`.onAppear`)
 
 Done when:
-- Squadmates see each other's plays in the feed
-- Tapping a play opens the detail screen
+- ✅ Squadmates see each other's plays in the feed
+- ✅ Tapping a play opens the detail screen
 
-### Milestone 5: Reactions
+### Milestone 5: Reactions ✅ COMPLETE
 
 Goal:
 - Add the simplest interaction loop
 
 Tasks:
-- Create reaction write model in Firestore
-- Build emoji reaction UI
-- Prevent duplicate reactions per user
-- Show current user's reaction state
-- Show reaction summary counts
-- Handle optimistic updates or loading states
+- ✅ Reaction write model in Firestore (reactions map: `userID → emoji`)
+- ✅ Build emoji reaction UI (🔥 💪 👏 in `PlayCardView`)
+- ✅ Prevent duplicate reactions per user
+- ✅ Show current user's reaction state (highlighted button)
+- ✅ Show reaction summary counts
+- ✅ Optimistic local update via `FeedViewModel`
 
 Done when:
-- A user can react to a play
-- The reaction is visible to other squad members
+- ✅ A user can react to a play
+- ✅ The reaction is visible to other squad members
 
-### Milestone 6: Push notifications
+### Milestone 6: Push notifications ⚠️ PARKED
 
 Goal:
 - Notify users when the loop advances
 
-Tasks:
-- Register device token with FCM
-- Store device registration under the user
-- Create Cloud Function for `new_play`
-- Create Cloud Function for `new_reaction`
-- Send push to squadmates except sender
-- Send reaction push to original poster
-- Handle push deep-link routing in app
+Parked because:
+- Requires paid Apple Developer account for push capability and APNs
+- FCM Cloud Functions need a paid Firebase plan (Blaze)
 
-Done when:
-- New play sends push to squadmates
-- New reaction sends push to original poster
-
-### Milestone 7: Widget integration
+### Milestone 7: Widget integration 🔄 CODE COMPLETE / DEVICE BLOCKED
 
 Goal:
 - Make the latest squad play visible on the home screen
 
 Tasks:
-- Define widget payload model
-- Build App Group storage helper
-- Write latest play payload from app to shared store
-- Build widget timeline provider
-- Build widget entry view
-- Reload widget timelines after local app updates
-- Add widget setup education screen
-- Test stale-data and empty-state behavior
+- ✅ Define `WidgetPayload` model
+- ✅ Build `AppGroupStore` (shared file container under `group.com.playsnapp.shared`)
+- ✅ Write latest play payload after post (`CapturePreviewView` → `widgetSyncService`)
+- ✅ Build widget timeline provider (`WidgetProvider`)
+- ✅ Build widget entry view with `AsyncImage` + sender/sport overlay (`containerBackground` API)
+- ✅ Reload widget timelines after post (`WidgetCenter.shared.reloadAllTimelines`)
+- ✅ App Groups capability in both debug entitlements + release entitlements
+- ✅ Fixed suite name mismatch (`playsnap` → `playsnapp`)
+- ✅ Switched from `UserDefaults(suiteName:)` to `FileManager` container (avoids `cfprefsd` error)
+- ⚠️ On-device data sharing not verified — `containerURL(forSecurityApplicationGroupIdentifier:)` may return nil if provisioning profile hasn't picked up the App Group capability yet
+- ⚠️ Widget setup education screen — deferred to Milestone 9 polish
 
 Done when:
-- Local widget renders the latest known squad play
-- Widget handles empty and stale content safely
+- Widget renders the latest squad play photo after posting ← blocked on device provisioning
+- ✅ Widget handles empty state safely (shows gradient placeholder)
+
+Notes:
+- Testing on iPhone 11; widget UI works but payload not yet reaching widget
+- To unblock: in Xcode → both targets → Signing & Capabilities → App Groups → verify checkmark on `group.com.playsnapp.shared`, then clean build + reinstall
 
 ### Milestone 8: Video support
 
@@ -239,17 +238,13 @@ The practical order is:
 9. Video
 10. Polish
 
-## 5. Current tickets (as of Milestone 2 completion)
+## 5. Current tickets (as of Milestone 7 in progress)
 
-Milestones 0, 1, and 2 are done. The immediate next tickets are:
+Milestones 0–6 are done (6 parked). Milestone 7 code is complete but blocked on device. Immediate next tickets:
 
-1. **Build `CameraView` with AVFoundation live preview** — replace stub with real `AVCaptureSession` preview, request camera permission
-2. **Capture and compress photo** — tap-to-capture, compress to JPEG before upload
-3. **Implement `FirebaseStorageService.uploadPhoto`** — upload to `squads/{squadID}/plays/{playID}/original.jpg`
-4. **Write `Play` document to Firestore** — create `squads/{squadID}/plays/{playID}` after upload completes
-5. **Return success to UI and show in feed** — navigate back or show confirmation after post
-6. **Configure App Groups in Xcode** — add capability to both app and widget targets, ID: `group.com.playsnap.shared` (needed for Milestone 7)
-7. **Implement `FirebasePlayService`** — Firestore listener for squad feed (Milestone 4)
+1. **Unblock widget on device** — verify App Group checkmark in Xcode Signing & Capabilities for both targets, clean build, reinstall; test by posting a photo and checking the widget updates
+2. **Milestone 8: Video capture** — AVFoundation video recording, 15s cap, thumbnail generation, upload `.mov` to Firebase Storage, write Play document with `mediaType: .video`
+3. **Milestone 9: Polish** — sign-out flow, profile edit, loading/error state improvements, TestFlight prep
 
 ## 6. Recommended acceptance checks
 

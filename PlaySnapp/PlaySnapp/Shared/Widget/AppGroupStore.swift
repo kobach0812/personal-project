@@ -10,27 +10,24 @@ struct WidgetPayload: Codable, Equatable, Sendable {
 }
 
 enum AppGroupStore {
-    nonisolated static let suiteName = "group.com.playsnap.shared"
-    nonisolated private static let payloadKey = "latest_widget_payload"
+    nonisolated static let suiteName = "group.com.playsnapp.shared"
+    nonisolated private static let payloadFilename = "latest_widget_payload.json"
 
     nonisolated static func save(_ payload: WidgetPayload) {
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            return
-        }
-
+        guard let fileURL = containerFileURL() else { return }
         let data = try? JSONEncoder().encode(payload)
-        defaults.set(data, forKey: payloadKey)
+        try? data?.write(to: fileURL, options: .atomic)
     }
 
     nonisolated static func load() -> WidgetPayload? {
-        guard
-            let defaults = UserDefaults(suiteName: suiteName),
-            let data = defaults.data(forKey: payloadKey),
-            let payload = try? JSONDecoder().decode(WidgetPayload.self, from: data)
-        else {
-            return nil
-        }
+        guard let fileURL = containerFileURL(),
+              let data = try? Data(contentsOf: fileURL) else { return nil }
+        return try? JSONDecoder().decode(WidgetPayload.self, from: data)
+    }
 
-        return payload
+    nonisolated private static func containerFileURL() -> URL? {
+        FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: suiteName)?
+            .appendingPathComponent(payloadFilename)
     }
 }

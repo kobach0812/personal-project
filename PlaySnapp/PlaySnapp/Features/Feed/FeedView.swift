@@ -49,8 +49,8 @@ struct FeedView: View {
                 }
             }
             .navigationTitle("Squad feed")
-            .task {
-                await viewModel.load(playService: environment.playService)
+            .onAppear {
+                Task { await viewModel.load(playService: environment.playService) }
             }
         }
     }

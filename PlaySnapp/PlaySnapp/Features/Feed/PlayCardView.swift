@@ -6,33 +6,34 @@ struct PlayCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            RoundedRectangle(cornerRadius: 24)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.orange.opacity(0.6), Color.red.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(height: 220)
-                .overlay(alignment: .topLeading) {
-                    HStack(spacing: 8) {
-                        Label(play.mediaType == .photo ? "Photo" : "Video", systemImage: play.mediaType == .photo ? "photo.fill" : "video.fill")
+            AsyncImage(url: play.mediaURL) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                Color.orange.opacity(0.25)
+                    .overlay(ProgressView())
+            }
+            .frame(height: 220)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(alignment: .topLeading) {
+                HStack(spacing: 8) {
+                    Label(play.mediaType == .photo ? "Photo" : "Video", systemImage: play.mediaType == .photo ? "photo.fill" : "video.fill")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.thinMaterial, in: Capsule())
+
+                    if let durationSeconds = play.durationSeconds {
+                        Text("\(durationSeconds)s")
                             .font(.caption.weight(.semibold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .background(.thinMaterial, in: Capsule())
-
-                        if let durationSeconds = play.durationSeconds {
-                            Text("\(durationSeconds)s")
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(.thinMaterial, in: Capsule())
-                        }
                     }
-                    .padding(14)
                 }
+                .padding(14)
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(play.senderName)

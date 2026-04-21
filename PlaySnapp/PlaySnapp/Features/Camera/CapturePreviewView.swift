@@ -66,12 +66,21 @@ struct CapturePreviewView: View {
             let raw = image.jpegData(compressionQuality: 1.0) ?? Data()
             let compressed = ImageCompressor.jpegData(from: raw) ?? raw
             let url = try await env.storageService.uploadPhoto(data: compressed, squadID: squad.id)
-            _ = try await env.playService.postPlay(
+            let play = try await env.playService.postPlay(
                 mediaURL: url,
                 storagePath: nil,
                 mediaType: .photo,
                 caption: caption.isEmpty ? nil : caption
             )
+            let payload = WidgetPayload(
+                playID: play.id,
+                squadID: play.squadID,
+                senderName: play.senderName,
+                sportName: squad.sport.displayName,
+                createdAt: play.createdAt,
+                thumbnailURL: play.mediaURL
+            )
+            await env.widgetSyncService.storeLatestPlay(payload)
             onDiscard()
         } catch {
             errorMessage = error.localizedDescription

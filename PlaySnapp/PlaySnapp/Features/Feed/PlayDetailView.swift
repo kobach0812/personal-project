@@ -6,15 +6,16 @@ struct PlayDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.orange.opacity(0.65), Color.red.opacity(0.6)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(height: 340)
+                AsyncImage(url: play.mediaURL) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Color.orange.opacity(0.25)
+                        .overlay(ProgressView())
+                }
+                .frame(height: 340)
+                .clipShape(RoundedRectangle(cornerRadius: 28))
 
                 Text(play.senderName)
                     .font(.title2.bold())

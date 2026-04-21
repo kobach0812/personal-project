@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Combine
 import UIKit
 
@@ -79,7 +79,7 @@ final class CameraViewModel: ObservableObject {
     }
 }
 
-private final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+private final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
     private let completion: (UIImage?) -> Void
 
     init(completion: @escaping (UIImage?) -> Void) {
