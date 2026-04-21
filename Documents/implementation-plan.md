@@ -159,7 +159,7 @@ Parked because:
 - Requires paid Apple Developer account for push capability and APNs
 - FCM Cloud Functions need a paid Firebase plan (Blaze)
 
-### Milestone 7: Widget integration 🔄 CODE COMPLETE / DEVICE BLOCKED
+### Milestone 7: Widget integration ✅ COMPLETE
 
 Goal:
 - Make the latest squad play visible on the home screen
@@ -204,6 +204,81 @@ Done when:
 - User can post a short video
 - Feed and detail screens render video safely
 
+### Milestone 10: Fair-play rotation tournament
+
+Goal:
+- Let a squad run a live session across multiple courts with fair rotation and a live billboard. Based on the JS prototype in `ideas.md` / conversation: sort roster by games played ascending, pick top `courts × 4`, pair into matches, update stats after each match.
+
+Scope decisions (locked):
+- **Doubles-only** (4 players/court). Feature is gated to squads whose sport is badminton / pickleball / tennis doubles. Hidden for other sports.
+- One **organizer** device drives writes; other squad members get a read-only live view. Organizer = `session.createdBy`.
+- A session is ephemeral (one evening of play), but per-session results **roll up into a permanent squad leaderboard** — see "Permanent leaderboard" below.
+- Entry point: **button** on the feed or profile screen (not a new root tab), since sessions are occasional.
+
+Permanent leaderboard:
+- Separate collection: `squads/{squadID}/leaderboard/{userID}` with `{ totalPlayed, totalWins, totalLosses }`.
+- When a match result is recorded, the Firestore transaction updates **both** the session doc AND the leaderboard entries for the 4 players (only for players with a real `userID` — guests are session-only).
+- Billboard UI has a toggle: "This session" vs "All time".
+
+Data model:
+
+```
+squads/{squadID}/tournaments/{sessionID}
+  - createdAt, createdBy, status: "active" | "finished"
+  - courts: Int
+  - players: [{ userID?, name, played, wins, losses }]   // userID optional for guests
+  - currentRound: [{ court, teamA: [name,name], teamB: [name,name] }]
+  - history: [{ roundID, court, teamA, teamB, winnerTeam, endedAt }]
+```
+
+Domain layer:
+- `TournamentSession`, `TournamentPlayer`, `TournamentMatch` models in `Domain/Models/`
+- `TournamentServicing` protocol in `Domain/Services/`:
+  - `createSession(squadID:, courts:, players:) async throws -> TournamentSession`
+  - `generateRound(sessionID:) async throws -> [TournamentMatch]` — sort by `played` asc, random tiebreak, slice top `courts*4`, pair `[0,1] vs [2,3]`
+  - `recordResult(sessionID:, match:, winnerTeam:) async throws` — increments played/wins/losses for the 4 players, appends to history
+  - `observeSession(sessionID:) -> AsyncStream<TournamentSession>` — Firestore snapshot listener for the live billboard
+  - `endSession(sessionID:) async throws`
+
+Data layer:
+- `StubTournamentService` for previews/tests (in-memory roster)
+- `FirebaseTournamentService` (actor) using Firestore transactions for `recordResult` so stats updates are atomic
+
+Feature layer (`Features/Tournament/`):
+- `TournamentSetupView` — roster input (pull from squad members + add guests), court count stepper, "Start session" button. Validates `players.count >= 4`; warns if `players.count < courts*4` ("n players will sit out this round").
+- `TournamentRoundView` — current round's matches grouped by court. Each match has a "Team A won" / "Team B won" button visible only to the organizer.
+- `TournamentBillboardView` — roster sorted by wins desc, win-rate tiebreak. Shows played count + W/L.
+- `TournamentViewModel` — holds observed session, exposes `generateNextRound`, `recordResult`.
+
+Routing:
+- Entry button on the feed or profile screen. Feature hidden unless `squad.sport ∈ {badminton, pickleball, tennis}`.
+
+Tasks:
+- Add Domain models + `TournamentServicing` protocol
+- Implement rotation algorithm (pure function, unit-testable): input `[TournamentPlayer]` + `courts` → output `[TournamentMatch]` + `[sittingOut]`
+- Unit tests: 30 players / 4 courts → 14 sit out; after round, those 14 are first picked next round
+- Unit tests: billboard sort — wins primary, win-rate tiebreak, zero-played handled
+- `StubTournamentService` + preview fixtures
+- `FirebaseTournamentService` with Firestore transaction that updates session doc **and** leaderboard entries atomically
+- Leaderboard collection + billboard toggle ("This session" / "All time")
+- `TournamentSetupView`, `TournamentRoundView`, `TournamentBillboardView`
+- `AppEnvironment` wiring (stub vs Firebase)
+- Organizer vs viewer gating (compare `session.createdBy` to current user)
+- Firestore security rule: only squad members can read; only `createdBy` can write match results
+
+Done when:
+- Organizer can start a session with N players and C courts
+- Round 1 picks `C*4` players with lowest `played` count
+- After recording a result, the next round prioritizes those who sat out
+- All squad members see the live billboard update as matches are recorded
+- Ending the session marks it `finished` and the UI exits back to the feed
+- All-time billboard reflects the session's results after it ends
+
+Risks / edge cases:
+- Ties in `played`: random tiebreak is fine, but seed by last-round sit-out bias so the same person doesn't repeatedly sit out
+- Network loss mid-result-record: Firestore transaction retries; UI should show "syncing" state
+- Guest players (no `userID`): identified by name only — warn on duplicate names
+
 ### Milestone 9: Polish and beta readiness
 
 Goal:
@@ -237,6 +312,7 @@ The practical order is:
 8. Widget
 9. Video
 10. Polish
+11. Fair-play rotation tournament
 
 ## 5. Current tickets (as of Milestone 7 in progress)
 

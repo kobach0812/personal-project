@@ -80,6 +80,9 @@ struct CapturePreviewView: View {
                 createdAt: play.createdAt,
                 thumbnailURL: play.mediaURL
             )
+            if let thumbnailData = WidgetThumbnailRenderer.jpegData(from: image, maxDimension: 600) {
+                AppGroupStore.saveThumbnail(thumbnailData)
+            }
             await env.widgetSyncService.storeLatestPlay(payload)
             onDiscard()
         } catch {

@@ -18,14 +18,10 @@ struct WidgetEntryView: View {
         .padding(12)
         .containerBackground(for: .widget) {
             ZStack {
-                if let thumbnailURL = entry.payload?.thumbnailURL {
-                    AsyncImage(url: thumbnailURL) { image in
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    } placeholder: {
-                        gradientBackground
-                    }
+                if let thumbnail = localThumbnail() {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
                 } else {
                     gradientBackground
                 }
@@ -37,6 +33,11 @@ struct WidgetEntryView: View {
                 )
             }
         }
+    }
+
+    private func localThumbnail() -> UIImage? {
+        guard let data = AppGroupStore.loadThumbnailData() else { return nil }
+        return UIImage(data: data)
     }
 
     private var gradientBackground: some View {
