@@ -1,54 +1,79 @@
 import SwiftUI
 
 struct CameraView: View {
-    @StateObject private var viewModel = CameraViewModel()
+    @StateObject private var vm = CameraViewModel()
+    @EnvironmentObject private var env: AppEnvironment
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.black.opacity(0.85), Color.orange.opacity(0.7)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .overlay {
-                        VStack(spacing: 12) {
-                            Image(systemName: "camera.aperture")
-                                .font(.system(size: 48))
-                                .foregroundStyle(.white)
+        ZStack {
+            Color.black.ignoresSafeArea()
 
-                            Text("Camera scaffold ready")
-                                .font(.headline)
-                                .foregroundStyle(.white)
+            if vm.accessDenied {
+                permissionDeniedView
+            } else {
+                CameraPreviewView(session: vm.session)
+                    .ignoresSafeArea()
 
-                            Text("AVFoundation capture is the next slice. This screen already holds the right place in navigation.")
-                                .multilineTextAlignment(.center)
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.8))
-                                .padding(.horizontal, 32)
-                        }
-                    }
-                    .frame(height: 360)
-
-                NavigationLink {
-                    CapturePreviewView()
-                } label: {
-                    Label("Open capture preview", systemImage: "paperplane.fill")
-                        .frame(maxWidth: .infinity)
+                if !vm.isReady {
+                    ProgressView()
+                        .tint(.white)
                 }
-                .buttonStyle(.borderedProminent)
 
-                Text(viewModel.statusText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
+                VStack {
+                    Spacer()
+                    captureButton
+                        .padding(.bottom, 48)
+                }
             }
-            .padding(20)
-            .navigationTitle("Camera")
         }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { vm.capturedImage != nil },
+                set: { if !$0 { vm.discardCapture() } }
+            )
+        ) {
+            if let image = vm.capturedImage {
+                CapturePreviewView(image: image, onDiscard: vm.discardCapture)
+                    .environmentObject(env)
+            }
+        }
+        .onAppear { vm.onAppear() }
+        .onDisappear { vm.onDisappear() }
+    }
+
+    private var captureButton: some View {
+        Button(action: vm.capturePhoto) {
+            ZStack {
+                Circle()
+                    .stroke(.white.opacity(0.5), lineWidth: 3)
+                    .frame(width: 80, height: 80)
+                Circle()
+                    .fill(.white)
+                    .frame(width: 66, height: 66)
+            }
+        }
+    }
+
+    private var permissionDeniedView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "camera.slash")
+                .font(.system(size: 48))
+                .foregroundStyle(.white.opacity(0.6))
+            Text("Camera access required")
+                .font(.headline)
+                .foregroundStyle(.white)
+            Text("Enable it in Settings to post plays.")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            .buttonStyle(.bordered)
+            .tint(.white)
+        }
+        .padding(32)
     }
 }

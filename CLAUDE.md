@@ -1,87 +1,65 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-## Build & Run
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-Open `PlaySnapp/PlaySnapp.xcodeproj` in Xcode. The project uses filesystem-synchronized groups — files added to the filesystem appear in Xcode automatically.
+## 1. Think Before Coding
 
-- **Build**: `Cmd+B` in Xcode (or `xcodebuild build -project PlaySnapp/PlaySnapp.xcodeproj -scheme PlaySnapp -destination 'platform=iOS Simulator,name=iPhone 16'`)
-- **Run tests**: `Cmd+U` in Xcode (or `xcodebuild test -project PlaySnapp/PlaySnapp.xcodeproj -scheme PlaySnapp -destination 'platform=iOS Simulator,name=iPhone 16'`)
-- **Run single test**: Use `xcodebuild test` with `-only-testing:PlaySnappTests/TestClassName/testMethodName`
-- **Deployment target**: iOS 18.6
-- **Swift version**: 5.0
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-### SPM Dependencies
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-Only one external dependency: `firebase-ios-sdk` >= 12.11.0 (FirebaseAuth, FirebaseCore, FirebaseFirestore, FirebaseMessaging, FirebaseStorage). Managed via Xcode's SPM integration, not a standalone Package.swift.
+## 2. Simplicity First
 
-## Architecture
+**Minimum code that solves the problem. Nothing speculative.**
 
-SwiftUI + MVVM with strict Domain/Data separation. The core rule: **simple internally, strict at the boundaries.**
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
 
-### Layer Structure
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-| Layer | Location | Owns |
-|-------|----------|------|
-| Domain | `PlaySnapp/Domain/` | Protocol contracts (`*Servicing` suffix) and value-type models. No Firebase/SDK imports. |
-| Data | `PlaySnapp/Data/` | Concrete implementations behind domain protocols. `Firebase*` for production, `Stub*` for development, `Local*` for platform services. |
-| Features | `PlaySnapp/Features/` | SwiftUI views and `@MainActor ObservableObject` view models per feature. Views never import Firebase. |
-| Infrastructure | `PlaySnapp/Infrastructure/` | Platform wrappers (e.g., `CameraManager` wrapping AVFoundation). |
-| PreviewSupport | `PlaySnapp/PreviewSupport/` | Fixture data for SwiftUI previews only. |
+## 3. Surgical Changes
 
-### Dependency Injection
+**Touch only what you must. Clean up only your own mess.**
 
-`AppEnvironment` is the service locator/DI container, injected as `@EnvironmentObject`. It is bootstrapped with one of two `AppDataSource` values:
-- `.development` — all stub services with shared in-memory state
-- `.firebasePrepared` — real Firebase auth/storage, stubs for squad/play/notifications
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
 
-### Navigation
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
 
-`AppRouter` drives phase-based navigation via a published `AppPhase` enum (`.loading` → `.auth` → `.profileSetup` → `.squadSetup` → `.widgetIntro` → `.main`). `RootView` switches on the phase. The main phase uses a `TabView` with 4 tabs (camera, feed, notifications, profile).
+The test: Every changed line should trace directly to the user's request.
 
-### Concurrency
+## 4. Goal-Driven Execution
 
-- Services use Swift `actor` types for concurrency safety
-- Only UI-facing types are `@MainActor` (views, view models, router, environment)
-- No project-wide actor isolation
-- Firebase implementations use `#if canImport(FirebaseAuth)` etc. so the project compiles without Firebase SDKs linked
+**Define success criteria. Loop until verified.**
 
-## Naming Conventions
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
 
-- Domain protocols: `*Servicing` (e.g., `AuthServicing`, `PlayServicing`)
-- Firebase implementations: `Firebase*` (e.g., `FirebaseAuthService`)
-- Stub implementations: `Stub*` (e.g., `StubAuthService`)
-- Test doubles: `*Stub` (e.g., `AuthServiceStub`) — implemented as `actor` types
-- Domain models: value types that are `Codable`, `Equatable`, `Sendable` when possible
-- Error types: `*Error` enum conforming to `LocalizedError` (e.g., `AuthServiceError`)
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
 
-## Testing
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-Tests use the **Swift Testing framework** (`import Testing`, `@Test`, `#expect`), not XCTest. Test doubles are in `PlaySnappTests/TestDoubles.swift`.
+---
 
-Current coverage: routing logic (`AppRouterTests`) and onboarding view models (`OnboardingViewModelTests`). No tests yet for Feed, Camera, Profile, or Data layer implementations.
-
-## Widget Extension
-
-- Target: `WidgetExtensionExtension` (bundle ID: `com.andythang.PlaySnapp.WidgetExtension`)
-- Shared code: `AppGroupStore.swift` and `WidgetPayload` are included in both the app and widget targets via build file exception
-- Widget reads from `UserDefaults(suiteName: "group.com.playsnap.shared")`
-- Widget does NOT link Firebase — it only uses WidgetKit and SwiftUI
-
-## Key Rules (from Documents/maintainable-extendable-app.md)
-
-1. No feature screen may talk directly to Firebase, Storage, Firestore, WidgetKit, or UserDefaults
-2. New integrations must be added behind a domain protocol first
-3. Never create Firebase or service objects inline inside a feature view model
-4. Keep fixture/preview data out of production models
-5. Do not put Firebase SDK types inside domain models
-6. Refactor when a view model exceeds roughly 200-300 lines or does more than one thing
-7. Before adding a feature: check if it needs a new domain protocol, a new Data implementation, and whether it changes routing
-
-## Setup Gaps
-
-See `Documents/XCODE_SETUP.md` for remaining Xcode configuration steps:
-- App Groups capability not yet configured (entitlements files are empty)
-- Push Notifications and Background Modes capabilities not added
-- `GoogleService-Info.plist` bundle ID (`test.andythang.PlaySnapp`) does not match target bundle ID (`com.andythang.PlaySnapp`)
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

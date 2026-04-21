@@ -26,80 +26,85 @@ That means each milestone should produce something testable end to end, even if 
 
 ## 3. Milestones
 
-### Milestone 0: Project setup
+### Milestone 0: Project setup ✅ COMPLETE
 
 Goal:
 - Create a working Xcode project foundation
 
 Tasks:
-- Create iOS app target
-- Create widget extension target
-- Configure App Groups
-- Add Firebase SDK dependencies
-- Create Firebase project
-- Add `GoogleService-Info.plist`
-- Set up bundle identifiers
-- Set up Sign in with Apple capability
-- Set up push notification capability
-- Set up basic app routing and environment injection
+- ✅ Create iOS app target
+- ✅ Create widget extension target
+- ⚠️ Configure App Groups — entitlements added, capability must be toggled in Xcode Signing & Capabilities
+- ✅ Add Firebase SDK dependencies
+- ✅ Create Firebase project
+- ✅ Add `GoogleService-Info.plist`
+- ✅ Set up bundle identifiers
+- ⚠️ Sign in with Apple — parked; requires paid Apple Developer account
+- ⚠️ Push Notifications — skipped; requires paid Apple Developer account
+- ✅ Set up basic app routing and environment injection
 
 Done when:
-- App launches on simulator/device
-- Firebase initializes successfully
-- Widget target builds
+- ✅ App launches on simulator/device
+- ✅ Firebase initializes successfully
+- ✅ Widget target builds
 
-### Milestone 1: Auth and profile
+### Milestone 1: Auth and profile ✅ COMPLETE
 
 Goal:
 - Let a user sign in and complete a basic profile
 
 Tasks:
-- Build auth screen
-- Implement Sign in with Apple
-- Exchange Apple credential with Firebase Auth
-- Create `users/{uid}` document on first login
-- Build profile setup screen
-- Save `name`, `primarySport`, and optional avatar
-- Add session check on app launch
-- Route based on auth state and profile completion
+- ✅ Build auth screen (email / password + phone)
+- ⚠️ Sign in with Apple — parked until paid dev account is available
+- ✅ Exchange credential with Firebase Auth
+- ✅ Create `users/{uid}` document on first login via `FirebaseSessionDocumentStore`
+- ✅ Build profile setup screen
+- ✅ Save `name` and `primarySport` to Firestore
+- ✅ Add session check on app launch (`restoreSession`)
+- ✅ Route based on auth state and profile completion
+- ✅ Enable Email/Password provider in Firebase Console
+- ✅ Create Firestore database with auth rules in Firebase Console
+- ✅ Test end-to-end on device: sign up → profile → main tab
+- ⚠️ Avatar upload — deferred to profile edit in Milestone 9
 
 Done when:
-- User can sign in
-- User profile persists after relaunch
-- Returning user bypasses auth correctly
+- ✅ User can sign in with email
+- ✅ User profile persists after relaunch
+- ✅ Returning user bypasses auth correctly
 
-### Milestone 2: Squad creation and join flow
+### Milestone 2: Squad creation and join flow ✅ COMPLETE
 
 Goal:
 - Get every user into exactly one squad
 
 Tasks:
-- Build squad setup screen
-- Implement create squad flow
-- Create squad document and member document
-- Update user with `squadId`
-- Generate invite code
-- Build join by invite code flow
-- Validate invite code
-- Add join transaction
-- Handle invalid or expired code state
+- ✅ Build squad setup screen
+- ✅ Implement create squad flow
+- ✅ Create squad document and member document (batch write)
+- ✅ Update user with `squadID`
+- ✅ Generate invite code (6-char, ambiguous chars removed)
+- ✅ Build join by invite code flow
+- ✅ Validate invite code
+- ✅ Add join transaction (`FieldValue.arrayUnion` batch write)
+- ✅ Handle invalid or expired code state (`SquadServiceError.invalidInviteCode`)
+- ✅ Implement `FirebaseSquadService` (actor, backed by Firestore)
 
 Done when:
-- User can create a squad
-- Another user can join with invite code
-- Both users are members of the same squad in Firestore
+- ✅ User can create a squad
+- ✅ Another user can join with invite code
+- ✅ Both users are members of the same squad in Firestore
 
-### Milestone 3: Photo capture and upload
+### Milestone 3: Photo capture and upload 🔄 IN PROGRESS
 
 Goal:
 - Make the camera usable and upload a photo end to end
 
 Tasks:
-- Build camera screen with live preview
+- Build camera screen with AVFoundation live preview
 - Implement camera permissions flow
 - Capture photo
 - Compress image
-- Upload to Firebase Storage
+- Upload to Firebase Storage (`squads/{squadID}/plays/{playID}/original.jpg`)
 - Create `Play` document in Firestore
 - Return success state to UI
 - Handle upload failure and retry UI
@@ -234,20 +239,17 @@ The practical order is:
 9. Video
 10. Polish
 
-## 5. First tickets
+## 5. Current tickets (as of Milestone 2 completion)
 
-If you want to start coding immediately, these are the first tickets to create:
+Milestones 0, 1, and 2 are done. The immediate next tickets are:
 
-1. Create Xcode app target, widget target, and App Group
-2. Add Firebase SDK and initialize Firebase in `PlaySnapApp.swift`
-3. Implement app router for auth/profile/squad/camera states
-4. Build Sign in with Apple flow
-5. Create `users/{uid}` document on first login
-6. Build profile setup screen and save action
-7. Build create squad flow and Firestore writes
-8. Build join squad by invite code flow
-9. Build camera preview with photo capture
-10. Upload photo to Firebase Storage and create `Play` document
+1. **Build `CameraView` with AVFoundation live preview** — replace stub with real `AVCaptureSession` preview, request camera permission
+2. **Capture and compress photo** — tap-to-capture, compress to JPEG before upload
+3. **Implement `FirebaseStorageService.uploadPhoto`** — upload to `squads/{squadID}/plays/{playID}/original.jpg`
+4. **Write `Play` document to Firestore** — create `squads/{squadID}/plays/{playID}` after upload completes
+5. **Return success to UI and show in feed** — navigate back or show confirmation after post
+6. **Configure App Groups in Xcode** — add capability to both app and widget targets, ID: `group.com.playsnap.shared` (needed for Milestone 7)
+7. **Implement `FirebasePlayService`** — Firestore listener for squad feed (Milestone 4)
 
 ## 6. Recommended acceptance checks
 

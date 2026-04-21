@@ -8,11 +8,9 @@ final class FeedViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     func load(playService: PlayServicing) async {
-        guard plays.isEmpty else {
-            return
-        }
-
         isLoading = true
+        errorMessage = nil
+
         defer {
             isLoading = false
         }
@@ -30,7 +28,10 @@ final class FeedViewModel: ObservableObject {
         playService: PlayServicing
     ) async {
         do {
-            plays = try await playService.toggleReaction(for: playID, emoji: emoji)
+            let updatedPlay = try await playService.toggleReaction(for: playID, emoji: emoji)
+            if let index = plays.firstIndex(where: { $0.id == updatedPlay.id }) {
+                plays[index] = updatedPlay
+            }
         } catch {
             errorMessage = "Reaction failed."
         }

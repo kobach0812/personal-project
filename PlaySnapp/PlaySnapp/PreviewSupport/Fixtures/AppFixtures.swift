@@ -15,6 +15,7 @@ enum AppFixtures {
         id: "squad-1",
         name: "Tuesday Five-a-Side",
         sport: .football,
+        createdBy: "user-1",
         memberIDs: ["user-1", "user-2", "user-3"],
         inviteCode: "PLAY5",
         createdAt: .now
@@ -28,6 +29,7 @@ enum AppFixtures {
             senderName: "Maya",
             mediaType: .photo,
             mediaURL: URL(string: "https://example.com/plays/1.jpg")!,
+            storagePath: nil,
             thumbnailURL: nil,
             caption: "Top bins before work.",
             durationSeconds: nil,
@@ -42,6 +44,7 @@ enum AppFixtures {
             senderName: "Jordan",
             mediaType: .video,
             mediaURL: URL(string: "https://example.com/plays/2.mov")!,
+            storagePath: nil,
             thumbnailURL: URL(string: "https://example.com/plays/2.jpg")!,
             caption: "Quick finishing drill.",
             durationSeconds: 14,
@@ -57,6 +60,9 @@ enum AppFixtures {
             type: .newPlay,
             title: "New squad play",
             message: "Maya just shared a new moment.",
+            actorID: "user-2",
+            recipientID: "user-1",
+            squadID: "squad-1",
             createdAt: .now.addingTimeInterval(-300),
             playID: "play-1",
             readAt: nil
@@ -66,6 +72,9 @@ enum AppFixtures {
             type: .reaction,
             title: "Reaction received",
             message: "Jordan reacted to your last post.",
+            actorID: "user-3",
+            recipientID: "user-1",
+            squadID: "squad-1",
             createdAt: .now.addingTimeInterval(-1800),
             playID: "play-2",
             readAt: .now.addingTimeInterval(-1200)

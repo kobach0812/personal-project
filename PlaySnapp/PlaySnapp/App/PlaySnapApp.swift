@@ -12,6 +12,11 @@ struct PlaySnapApp: App {
                 .environmentObject(environment)
                 .task {
                     await router.bootstrap(using: environment.authService)
+                    // Attempt device registration once we know the user is authenticated.
+                    // Fails silently if the user is not signed in or permissions are not granted yet.
+                    if router.phase != .auth {
+                        try? await environment.notificationService.registerCurrentDevice()
+                    }
                 }
         }
     }

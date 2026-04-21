@@ -19,4 +19,25 @@ actor FirebaseUserProfileService: UserProfileServicing {
 
         return try await sessionStore.fetchCurrentUser(for: currentUser)
     }
+
+    func updateProfile(name: String, sport: Sport) async throws -> AppUser {
+        let currentUser = try await requireCurrentUser()
+        try await authGateway.updateCurrentUserDisplayName(name)
+        return try await sessionStore.updateProfile(userID: currentUser.id, name: name, sport: sport)
+    }
+
+    func updateAvatar(url: URL) async throws -> AppUser {
+        let currentUser = try await requireCurrentUser()
+        return try await sessionStore.updateAvatar(userID: currentUser.id, url: url)
+    }
+}
+
+private extension FirebaseUserProfileService {
+    func requireCurrentUser() async throws -> FirebaseAuthenticatedUser {
+        guard let currentUser = try await authGateway.currentUser() else {
+            throw AuthServiceError.missingSession
+        }
+
+        return currentUser
+    }
 }

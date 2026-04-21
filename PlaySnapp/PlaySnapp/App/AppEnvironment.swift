@@ -82,8 +82,8 @@ extension AppEnvironment {
                 authGateway: authGateway,
                 sessionStore: sessionStore
             ),
-            squadService: StubSquadService(),
-            playService: StubPlayService(),
+            squadService: FirebaseSquadService(authGateway: authGateway),
+            playService: FirebasePlayService(authGateway: authGateway),
             storageService: FirebaseStorageService(),
             notificationService: StubNotificationService(),
             widgetSyncService: LocalWidgetSyncService()

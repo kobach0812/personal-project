@@ -8,4 +8,8 @@ actor StubStorageService: StorageServicing {
     func uploadVideo(fileURL: URL, squadID: String) async throws -> URL {
         URL(string: "https://example.com/squads/\(squadID)/video.mov")!
     }
+
+    func uploadAvatar(data: Data, userID: String) async throws -> URL {
+        URL(string: "https://example.com/users/\(userID)/avatar.jpg")!
+    }
 }

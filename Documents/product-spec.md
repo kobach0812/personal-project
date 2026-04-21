@@ -18,7 +18,7 @@ PlaySnap makes a sports player's latest moment appear on their squadmates' home 
 
 ### In scope
 
-- Sign in with Apple
+- Sign in with Apple (production target; email/phone used as workaround during development)
 - Basic profile creation
 - Create or join one squad
 - Capture photo or short video
@@ -75,15 +75,20 @@ Purpose:
 Content:
 - App logo
 - One-line value proposition
-- "Continue with Apple" button
+- "Continue with Apple" button (production intent)
 - Terms and privacy links
 
 Primary actions:
-- Sign in with Apple
+- Sign in with Apple (production)
 
 Rules:
-- No email-password flow in MVP
 - If user already has a valid session, skip this screen
+
+> **Current implementation note**: Sign in with Apple requires a paid Apple Developer account
+> and is temporarily parked. The current auth screen offers email/password and phone number
+> sign-in as a working substitute. The routing logic after sign-in is identical.
+> Restore Apple Sign In before TestFlight by enabling the capability and wiring
+> `AppleSignInProvider.swift` into `FirebaseAuthService`.
 
 Next step:
 - If profile is incomplete, go to Create Profile

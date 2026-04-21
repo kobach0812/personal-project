@@ -2,9 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.playsnapp.shared</string>
-	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>PlaySnapp uses your camera to capture plays to share with your squad.</string>
+	<key>UIBackgroundModes</key>
+	<array/>
 </dict>
 </plist>

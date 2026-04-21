@@ -7,8 +7,14 @@ struct FeedView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.isLoading {
+                if viewModel.isLoading && viewModel.plays.isEmpty {
                     ProgressView("Loading squad feed...")
+                } else if let errorMessage = viewModel.errorMessage, viewModel.plays.isEmpty {
+                    ContentUnavailableView(
+                        "Could not load feed",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(errorMessage)
+                    )
                 } else if viewModel.plays.isEmpty {
                     ContentUnavailableView(
                         "No plays yet",
@@ -36,6 +42,9 @@ struct FeedView: View {
                             }
                         }
                         .padding(16)
+                    }
+                    .refreshable {
+                        await viewModel.load(playService: environment.playService)
                     }
                 }
             }

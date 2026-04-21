@@ -36,9 +36,7 @@ actor FirebaseSessionDocumentStore {
 
     func markJoinedSquad(userID: String) async throws -> AppSession {
         let document = try await mergeDocument(
-            fields: [
-                "hasJoinedSquad": true,
-            ],
+            fields: ["hasJoinedSquad": true],
             for: userID
         )
 
@@ -47,9 +45,7 @@ actor FirebaseSessionDocumentStore {
 
     func markSeenWidgetIntro(userID: String) async throws -> AppSession {
         let document = try await mergeDocument(
-            fields: [
-                "hasSeenWidgetIntro": true,
-            ],
+            fields: ["hasSeenWidgetIntro": true],
             for: userID
         )
 
@@ -58,7 +54,25 @@ actor FirebaseSessionDocumentStore {
 
     func fetchCurrentUser(for user: FirebaseAuthenticatedUser) async throws -> AppUser {
         let document = try await fetchOrCreateUserDocument(for: user, preferredName: user.displayName)
-        return appUser(from: document, fallbackUser: user)
+        return appUser(from: document, userID: user.id, fallbackDisplayName: user.displayName, fallbackPhotoURL: user.photoURL)
+    }
+
+    func updateProfile(userID: String, name: String, sport: Sport) async throws -> AppUser {
+        let document = try await mergeDocument(
+            fields: ["name": name, "primarySport": sport.rawValue],
+            for: userID
+        )
+
+        return appUser(from: document, userID: userID, fallbackDisplayName: name)
+    }
+
+    func updateAvatar(userID: String, url: URL) async throws -> AppUser {
+        let document = try await mergeDocument(
+            fields: ["avatarURL": url.absoluteString],
+            for: userID
+        )
+
+        return appUser(from: document, userID: userID, fallbackPhotoURL: url)
     }
 }
 
@@ -90,7 +104,7 @@ private extension FirebaseSessionDocumentStore {
         #if canImport(FirebaseFirestore)
         let reference = userDocumentReference(for: userID)
         var updatedFields = fields
-        updatedFields["updatedAt"] = Date()
+        updatedFields["updatedAt"] = FieldValue.serverTimestamp()
 
         try await reference.setData(updatedFields, merge: true)
 
@@ -102,27 +116,38 @@ private extension FirebaseSessionDocumentStore {
     }
 
     func session(from data: [String: Any], userID: String) -> AppSession {
-        AppSession(
+        let remoteHasSeenWidgetIntro = data["hasSeenWidgetIntro"] as? Bool ?? false
+        let localHasSeenWidgetIntro = LocalOnboardingFlagStore.isSet(.hasSeenWidgetIntro, for: userID)
+
+        return AppSession(
             userID: userID,
             hasCompletedProfile: data["hasCompletedProfile"] as? Bool ?? false,
             hasJoinedSquad: data["hasJoinedSquad"] as? Bool ?? false,
-            hasSeenWidgetIntro: data["hasSeenWidgetIntro"] as? Bool ?? false
+            hasSeenWidgetIntro: remoteHasSeenWidgetIntro || localHasSeenWidgetIntro
         )
     }
 
     func appUser(
         from data: [String: Any],
-        fallbackUser: FirebaseAuthenticatedUser
+        userID: String,
+        fallbackDisplayName: String? = nil,
+        fallbackPhotoURL: URL? = nil
     ) -> AppUser {
         let rawName = data["name"] as? String
-        let resolvedName = rawName?.isEmpty == false ? rawName : fallbackUser.displayName
+        let resolvedName = rawName?.isEmpty == false ? rawName : fallbackDisplayName
         let rawSport = data["primarySport"] as? String
-        let avatarString = data["avatarURL"] as? String ?? fallbackUser.photoURL?.absoluteString
-        let createdAt = data["createdAt"] as? Date ?? .now
-        let updatedAt = data["updatedAt"] as? Date ?? createdAt
+        let avatarString = (data["avatarURL"] as? String) ?? fallbackPhotoURL?.absoluteString
+
+        #if canImport(FirebaseFirestore)
+        let createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? .now
+        let updatedAt = (data["updatedAt"] as? Timestamp)?.dateValue() ?? createdAt
+        #else
+        let createdAt = Date.now
+        let updatedAt = Date.now
+        #endif
 
         return AppUser(
-            id: fallbackUser.id,
+            id: userID,
             name: resolvedName ?? "Player",
             primarySport: Sport(rawValue: rawSport ?? "") ?? .football,
             avatarURL: avatarString.flatMap(URL.init(string:)),
@@ -140,8 +165,8 @@ private extension FirebaseSessionDocumentStore {
             "hasCompletedProfile": false,
             "hasJoinedSquad": false,
             "hasSeenWidgetIntro": false,
-            "createdAt": Date(),
-            "updatedAt": Date(),
+            "createdAt": FieldValue.serverTimestamp(),
+            "updatedAt": FieldValue.serverTimestamp(),
         ]
 
         if let preferredName, !preferredName.isEmpty {

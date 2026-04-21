@@ -14,6 +14,7 @@ actor StubSquadService: SquadServicing {
             id: UUID().uuidString,
             name: name,
             sport: sport,
+            createdBy: userID,
             memberIDs: [userID],
             inviteCode: String(name.prefix(4)).uppercased() + "1",
             createdAt: .now
@@ -30,6 +31,7 @@ actor StubSquadService: SquadServicing {
             id: "joined-squad",
             name: "Local Run Club",
             sport: .running,
+            createdBy: "user-4",
             memberIDs: [userID, "user-4"],
             inviteCode: inviteCode.uppercased(),
             createdAt: .now.addingTimeInterval(-7200)

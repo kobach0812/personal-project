@@ -29,6 +29,10 @@ actor FirebaseOnboardingProgressService: OnboardingProgressServicing {
 
     func markSeenWidgetIntro() async throws -> AppSession {
         let currentUser = try await requireCurrentUser()
+        // Write locally first so the flag survives even if the Firestore call below fails.
+        // session(from:userID:) merges this local flag on the next restoreSession() call,
+        // preventing the user from being shown the widget intro again after a network error.
+        LocalOnboardingFlagStore.set(.hasSeenWidgetIntro, for: currentUser.id)
         return try await sessionStore.markSeenWidgetIntro(userID: currentUser.id)
     }
 }

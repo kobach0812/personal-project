@@ -102,6 +102,30 @@ actor StubSessionStore {
         return currentSession
     }
 
+    /// Updates name and sport on an already-onboarded user without touching session flags.
+    func updateProfile(name: String, sport: Sport) throws -> AppUser {
+        guard var currentUser else {
+            throw AuthServiceError.missingSession
+        }
+
+        currentUser.name = name
+        currentUser.primarySport = sport
+        currentUser.updatedAt = Date()
+        self.currentUser = currentUser
+        return currentUser
+    }
+
+    func updateAvatar(url: URL) throws -> AppUser {
+        guard var currentUser else {
+            throw AuthServiceError.missingSession
+        }
+
+        currentUser.avatarURL = url
+        currentUser.updatedAt = Date()
+        self.currentUser = currentUser
+        return currentUser
+    }
+
     func setCurrentSquad(id: String?) {
         guard var currentUser else {
             return

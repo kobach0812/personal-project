@@ -62,9 +62,9 @@ Your proposed direction is good, but these changes matter:
 - It does not instantly refresh squadmates' widgets on other phones
 - Widget freshness across users must be treated as best effort, not guaranteed real time
 
-## 4. Recommended project structure
+## 4. Project structure
 
-The maintainable base structure should look like this:
+Current actual structure (as of Milestone 1):
 
 ```text
 PlaySnap/
@@ -74,14 +74,17 @@ PlaySnap/
 │   └── AppEnvironment.swift
 ├── Domain/
 │   ├── Models/
+│   │   ├── AppSession.swift
+│   │   ├── AppUser.swift
+│   │   ├── Squad.swift
 │   │   ├── Play.swift
 │   │   ├── PlayReaction.swift
-│   │   ├── Squad.swift
-│   │   ├── AppUser.swift
 │   │   ├── DeviceRegistration.swift
 │   │   └── AppNotification.swift
 │   └── Services/
 │       ├── AuthService.swift
+│       ├── OnboardingProgressService.swift
+│       ├── UserProfileService.swift
 │       ├── PlayService.swift
 │       ├── SquadService.swift
 │       ├── StorageService.swift
@@ -90,15 +93,29 @@ PlaySnap/
 ├── Data/
 │   ├── Firebase/
 │   │   ├── FirebaseConfiguration.swift
-│   │   ├── FirestorePaths.swift
+│   │   ├── FirestorePaths.swift          ← Firestore collection/document paths
+│   │   ├── StoragePaths.swift            ← Firebase Storage upload/download paths
+│   │   ├── FirebaseIntegrationError.swift
+│   │   ├── FirebaseAuthGateway.swift     ← thin wrapper over Firebase Auth SDK
+│   │   ├── FirebaseSessionDocumentStore.swift
 │   │   ├── FirebaseAuthService.swift
-│   │   └── FirebaseStorageService.swift
+│   │   ├── FirebaseOnboardingProgressService.swift
+│   │   ├── FirebaseUserProfileService.swift
+│   │   ├── FirebaseStorageService.swift  ← upload stubs, wired in Milestone 3
+│   │   ├── AppleSignInProvider.swift     ← parked until paid dev account
+│   │   ├── FirebaseSquadService.swift    ← TODO: Milestone 2
+│   │   ├── FirebasePlayService.swift     ← TODO: Milestone 4
+│   │   └── FirebaseNotificationService.swift ← TODO: Milestone 6
 │   ├── Local/
-│   │   └── LocalWidgetSyncService.swift
+│   │   ├── LocalWidgetSyncService.swift
+│   │   └── LocalOnboardingFlagStore.swift  ← offline-resilient onboarding flags
 │   └── Stubs/
+│       ├── StubSessionStore.swift        ← shared in-memory state for dev mode
 │       ├── StubAuthService.swift
-│       ├── StubPlayService.swift
+│       ├── StubOnboardingProgressService.swift
+│       ├── StubUserProfileService.swift
 │       ├── StubSquadService.swift
+│       ├── StubPlayService.swift
 │       ├── StubStorageService.swift
 │       └── StubNotificationService.swift
 ├── Features/
@@ -107,8 +124,11 @@ PlaySnap/
 │   │   └── AuthViewModel.swift
 │   ├── Onboarding/
 │   │   ├── ProfileSetupView.swift
+│   │   ├── ProfileSetupViewModel.swift
 │   │   ├── SquadSetupView.swift
-│   │   └── WidgetIntroView.swift
+│   │   ├── SquadSetupViewModel.swift
+│   │   ├── WidgetIntroView.swift
+│   │   └── WidgetIntroViewModel.swift
 │   ├── Camera/
 │   │   ├── CameraView.swift
 │   │   ├── CameraViewModel.swift
@@ -150,6 +170,7 @@ Notes:
 - `Data` may import Firebase, WidgetKit, or storage SDKs
 - `PreviewSupport` must not leak into production persistence code
 - `Utilities/` should stay small or it becomes a junk drawer
+- Files marked `← TODO` are the next Firebase implementations to write
 
 ## 5. Runtime architecture
 
@@ -194,21 +215,23 @@ Required fields:
 - `id`
 - `name`
 - `sport`
-- `createdBy`
+- `createdBy` — user ID of the creator; used for permission checks
 - `inviteCode`
-- `memberCount`
+- `memberCount` — denormalized count; the authoritative list lives in the `members` subcollection
 - `createdAt`
+
+Note: the Swift `Squad` model currently stores `memberIDs: [String]` for in-memory stub use. When `FirebaseSquadService` is implemented, member IDs will come from the Firestore `members` subcollection, and `memberCount` will be a field on the squad document.
 
 ### Play
 
 Required fields:
 
 - `id`
-- `squadId`
-- `senderId`
+- `squadID`
+- `senderID`
 - `mediaType` (`photo` or `video`)
-- `mediaURL`
-- `storagePath`
+- `mediaURL` — download URL for client display
+- `storagePath` — Firebase Storage path; required for server-side cleanup and migrations
 - `thumbnailURL`
 - `caption`
 - `durationSeconds`
@@ -218,7 +241,7 @@ Optional denormalized fields:
 
 - `senderName`
 - `senderAvatarURL`
-- `reactionSummary`
+- `reactionSummary` — lightweight emoji → count map; reactions subcollection is authoritative
 
 ### PlayReaction
 
@@ -244,10 +267,12 @@ Required fields:
 
 - `id`
 - `type`
-- `actorId`
-- `recipientId`
-- `playId`
-- `squadId`
+- `title` — localised display string
+- `message` — localised display string
+- `actorID` — user who triggered the notification (poster or reactor)
+- `recipientID` — user who should receive it; used by Cloud Functions for fan-out
+- `playID`
+- `squadID`
 - `createdAt`
 - `readAt`
 
@@ -277,7 +302,8 @@ Why this shape:
 
 ## 8. Storage layout
 
-Recommended Firebase Storage paths:
+Firebase Storage paths are centralised in `Data/Firebase/StoragePaths.swift`.
+Never build storage paths inline in upload code.
 
 ```text
 squads/{squadId}/plays/{playId}/original.jpg
@@ -286,14 +312,14 @@ squads/{squadId}/plays/{playId}/thumbnail.jpg
 avatars/{userId}/avatar.jpg
 ```
 
-Store both:
+Always store both:
 
-- download URL for client display
-- storage path for future cleanup or migrations
+- download URL on the Firestore document (`mediaURL`, `thumbnailURL`, `avatarURL`) for client display
+- storage path on the Firestore document (`storagePath`) for server-side cleanup and migrations
 
 ## 9. Auth flow
 
-Sign-in flow:
+Intended production flow (requires paid Apple Developer account):
 
 1. User signs in with Apple
 2. App exchanges Apple credential with Firebase Auth
@@ -302,6 +328,12 @@ Sign-in flow:
 5. If profile incomplete, route to profile setup
 6. If no squad membership, route to squad setup
 7. Otherwise route to camera
+
+Current MVP workaround (email / phone):
+
+- Apple Sign In is parked in `AppleSignInProvider.swift` until a paid developer account is available
+- The auth screen offers email/password and phone number (SMS) sign-in instead
+- The routing logic (steps 3–7) is identical regardless of sign-in method
 
 Important rule:
 
@@ -531,7 +563,7 @@ Why this order:
 
 These are the strongest decisions to lock now:
 
-- Ship with `Sign in with Apple` first
+- Ship with `Sign in with Apple` as the primary auth method once a paid developer account is active; email/phone is the current working substitute
 - Support one squad per user
 - Start with photo first if video slows camera delivery
 - Use reactions only, no comments

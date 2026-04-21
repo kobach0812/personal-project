@@ -6,29 +6,29 @@ import UIKit
 #endif
 
 enum VideoThumbnailGenerator {
-    static func makeThumbnailData(from fileURL: URL) -> Data? {
-        let asset = AVURLAsset(url: fileURL)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
+    /// Generates a JPEG thumbnail from the first frame of a video file.
+    /// Returns nil if the asset has no video track or the frame cannot be decoded.
+    static func makeThumbnailData(from fileURL: URL) async -> Data? {
+        await withCheckedContinuation { continuation in
+            let asset = AVURLAsset(url: fileURL)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
 
-        let semaphore = DispatchSemaphore(value: 0)
-        var thumbnailData: Data?
+            generator.generateCGImagesAsynchronously(
+                forTimes: [NSValue(time: .zero)]
+            ) { _, image, _, result, _ in
+                guard result == .succeeded, let image else {
+                    continuation.resume(returning: nil)
+                    return
+                }
 
-        generator.generateCGImagesAsynchronously(forTimes: [NSValue(time: .zero)]) { _, image, _, result, _ in
-            defer {
-                semaphore.signal()
+                #if canImport(UIKit)
+                let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.7)
+                continuation.resume(returning: data)
+                #else
+                continuation.resume(returning: nil)
+                #endif
             }
-
-            guard result == .succeeded, let image else {
-                return
-            }
-
-            #if canImport(UIKit)
-            thumbnailData = UIImage(cgImage: image).jpegData(compressionQuality: 0.7)
-            #endif
         }
-
-        _ = semaphore.wait(timeout: .now() + 5)
-        return thumbnailData
     }
 }

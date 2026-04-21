@@ -21,11 +21,23 @@ enum FirestorePaths {
         "\(squad(squadID))/plays"
     }
 
+    static func play(_ squadID: String, _ playID: String) -> String {
+        "\(squadPlays(squadID))/\(playID)"
+    }
+
     static func playReactions(squadID: String, playID: String) -> String {
         "\(squadPlays(squadID))/\(playID)/reactions"
     }
 
     static func invite(_ inviteCode: String) -> String {
         "invites/\(inviteCode)"
+    }
+
+    static func userNotifications(_ userID: String) -> String {
+        "\(user(userID))/notifications"
+    }
+
+    static func userNotification(_ notificationID: String, userID: String) -> String {
+        "\(userNotifications(userID))/\(notificationID)"
     }
 }

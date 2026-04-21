@@ -7,9 +7,29 @@ actor StubPlayService: PlayServicing {
         plays.sorted(by: { $0.createdAt > $1.createdAt })
     }
 
-    func toggleReaction(for playID: String, emoji: String) async throws -> [Play] {
+    func postPlay(mediaURL: URL, storagePath: String?, mediaType: MediaType, caption: String?) async throws -> Play {
+        let play = Play(
+            id: UUID().uuidString,
+            squadID: "stub-squad",
+            senderID: "stub-user",
+            senderName: "You",
+            mediaType: mediaType,
+            mediaURL: mediaURL,
+            storagePath: storagePath,
+            thumbnailURL: nil,
+            caption: caption,
+            durationSeconds: nil,
+            reactionSummary: [:],
+            currentUserReaction: nil,
+            createdAt: .now
+        )
+        plays.append(play)
+        return play
+    }
+
+    func toggleReaction(for playID: String, emoji: String) async throws -> Play {
         guard let index = plays.firstIndex(where: { $0.id == playID }) else {
-            return plays
+            throw PlayServiceError.notFound
         }
 
         var updated = plays[index]
@@ -36,6 +56,6 @@ actor StubPlayService: PlayServicing {
         }
 
         plays[index] = updated
-        return plays.sorted(by: { $0.createdAt > $1.createdAt })
+        return updated
     }
 }

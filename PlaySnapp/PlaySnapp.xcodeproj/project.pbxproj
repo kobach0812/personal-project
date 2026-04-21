@@ -65,6 +65,7 @@
 		F097FAA52F77A7F500557247 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		F097FAA72F77A7F500557247 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		F0A5948D2F7A0EAC008D5555 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		F0B0CDFF2F926B6000BA57FC /* WidgetExtensionExtensionRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WidgetExtensionExtensionRelease.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -82,12 +83,20 @@
 			);
 			target = F097FAA22F77A7F500557247 /* WidgetExtensionExtension */;
 		};
+		F0B0CE012F926EC900BA57FC /* Exceptions for "PlaySnapp" folder in "PlaySnapp" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F097FA102F77A65A00557247 /* PlaySnapp */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F097FA132F77A65A00557247 /* PlaySnapp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				F0B0CE012F926EC900BA57FC /* Exceptions for "PlaySnapp" folder in "PlaySnapp" target */,
 				F097FB242F77A8E800557247 /* Exceptions for "PlaySnapp" folder in "WidgetExtensionExtension" target */,
 			);
 			path = PlaySnapp;
@@ -155,6 +164,7 @@
 		F097FA082F77A65A00557247 = {
 			isa = PBXGroup;
 			children = (
+				F0B0CDFF2F926B6000BA57FC /* WidgetExtensionExtensionRelease.entitlements */,
 				F0A5948D2F7A0EAC008D5555 /* GoogleService-Info.plist */,
 				F093189D2F795FE2007CF7E9 /* WidgetExtensionExtension.entitlements */,
 				F097FA132F77A65A00557247 /* PlaySnapp */,
@@ -551,6 +561,7 @@
 				DEVELOPMENT_TEAM = D8RS4SY524;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PlaySnapp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -578,12 +589,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = PlaySnapp/PlaySnapp.entitlements;
+				CODE_SIGN_ENTITLEMENTS = PlaySnapp/PlaySnappRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = D8RS4SY524;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PlaySnapp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -729,7 +741,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
-				CODE_SIGN_ENTITLEMENTS = WidgetExtensionExtension.entitlements;
+				CODE_SIGN_ENTITLEMENTS = WidgetExtensionExtensionRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = D8RS4SY524;

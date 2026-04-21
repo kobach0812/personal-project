@@ -12,6 +12,9 @@ struct Play: Identifiable, Codable, Equatable, Sendable {
     var senderName: String
     var mediaType: MediaType
     var mediaURL: URL
+    /// Firebase Storage path. Required for server-side cleanup and future migrations.
+    /// Nil only in stub/preview contexts where no real upload has occurred.
+    var storagePath: String?
     var thumbnailURL: URL?
     var caption: String?
     var durationSeconds: Int?

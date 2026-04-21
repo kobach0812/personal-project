@@ -10,4 +10,12 @@ actor StubUserProfileService: UserProfileServicing {
     func fetchCurrentUser() async throws -> AppUser? {
         await sessionStore.fetchCurrentUser()
     }
+
+    func updateProfile(name: String, sport: Sport) async throws -> AppUser {
+        try await sessionStore.updateProfile(name: name, sport: sport)
+    }
+
+    func updateAvatar(url: URL) async throws -> AppUser {
+        try await sessionStore.updateAvatar(url: url)
+    }
 }

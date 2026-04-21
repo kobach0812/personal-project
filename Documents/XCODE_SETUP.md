@@ -32,14 +32,8 @@ Verify this instead:
 
 Add these capabilities to the app target:
 
-- `Sign in with Apple`
-- `Push Notifications`
-- `Background Modes`
-
-Add these background modes:
-
-- `Remote notifications`
-- `Background fetch` if you want best-effort widget refresh support
+- `Sign in with Apple` (add now even though Apple sign-in is parked — the entitlement must be present before enabling it)
+- `Background Modes` → check `Remote notifications`
 
 Add this capability to both app and widget targets:
 
@@ -49,9 +43,13 @@ Use the same group ID in both targets:
 
 - `group.com.playsnap.shared`
 
+> **Push Notifications**: This capability requires a paid Apple Developer account ($99/year).
+> Skip it for now. Phone auth and device token registration will not work until it is added.
+> Add it when you upgrade to a paid account before TestFlight.
+
 ## 5. Add Firebase
 
-Add Swift Package dependencies for:
+Firebase packages are already added via Xcode's SPM integration:
 
 - `FirebaseAuth`
 - `FirebaseFirestore`
@@ -59,29 +57,35 @@ Add Swift Package dependencies for:
 - `FirebaseMessaging`
 - `FirebaseCore`
 
-Then:
-
-1. Create a Firebase project.
-2. Register the iOS app bundle ID.
-3. Download `GoogleService-Info.plist`.
-4. Add it to the app target.
+`GoogleService-Info.plist` is already in the app target. Verify its bundle ID matches `com.andythang.PlaySnapp`.
 
 ## 6. Wire startup
 
-After Firebase packages are installed:
+[FirebaseConfiguration.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseConfiguration.swift) handles `FirebaseApp.configure()` with a guard against double-init.
 
-1. Verify [FirebaseConfiguration.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseConfiguration.swift) can import `FirebaseCore`.
-2. Keep `FirebaseConfiguration.configure()` as the single app bootstrap point.
-3. Let [PlaySnapApp.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/App/PlaySnapApp.swift) call the environment bootstrap only.
+[PlaySnapApp.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/App/PlaySnapApp.swift) is running `.firebasePrepared` — Firebase auth and Firestore are live.
 
-## 7. First milestone target
+No changes needed here.
 
-Once the project opens successfully, the first implementation target should be:
+## 7. Current auth approach
 
-1. Verify [FirebaseAuthService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseAuthService.swift) can complete real Apple sign-in and restore a Firebase-backed session
-2. Replace [StubStorageService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Stubs/StubStorageService.swift) with [FirebaseStorageService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseStorageService.swift)
-3. Persist the current user profile and session flags to Firestore
-4. Complete the profile flow
+Apple Sign In is temporarily parked because it requires a paid Apple Developer account for the entitlement to activate on device.
+
+The current auth screen offers:
+
+- Email / password (sign in or register)
+- Phone number with SMS verification code
+
+**Email auth is ready and works end to end.** Use this to test the onboarding flow.
+
+**Phone auth** requires the Firebase Phone provider to be enabled in the Firebase Console and a real device (APNS token). Skip it for now.
+
+When a paid developer account is available:
+
+1. Enable the `Push Notifications` capability in Xcode
+2. Enable the `Sign in with Apple` capability in Xcode
+3. Enable the Apple provider in the Firebase Console (Authentication → Sign-in methods)
+4. Uncomment [AppleSignInProvider.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/AppleSignInProvider.swift) and wire it into `FirebaseAuthService`
 
 ## 8. Current scaffold
 
@@ -90,27 +94,35 @@ The repo already includes:
 - App router and app shell
 - Auth, onboarding, feed, notifications, and profile screens
 - `Domain` contracts and models
-- `Data` implementations for stubs, local widget sync, and Firebase-backed auth bootstrap
+- `Data` implementations: Firebase-backed auth, Firestore session/profile, local widget sync, and stubs for squad/play/notifications
 - `PreviewSupport` fixtures separated from production models
 - Widget storage and widget placeholder files
-- Firebase path helpers and camera permission placeholder
-
-The next coding step after opening in Xcode is to wire Milestone 1 against the `Domain -> Data` boundaries, not to redesign the structure again.
+- `FirestorePaths` and `StoragePaths` path helpers
+- `LocalOnboardingFlagStore` for offline-resilient onboarding flags
+- Camera permission placeholder and shared utilities
 
 ## 9. Immediate next actions
 
-Based on the current repo state, do these next in order:
+Steps 1–6 below are the ordered path to Milestone 1 completion:
 
-1. Add capabilities in Xcode for the app target and widget target.
-2. Create the shared `App Groups` ID: `group.com.playsnap.shared`.
-3. Add the Firebase packages.
-4. Add `GoogleService-Info.plist` to the app target.
-5. Confirm [PlaySnapApp.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/App/PlaySnapApp.swift) is running in `.firebasePrepared`.
-6. In Firebase Console, enable the Apple auth provider and create the Firestore database.
-7. Verify sign-in works, then implement [FirebaseStorageService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/FirebaseStorageService.swift).
+1. ✅ Firebase packages added
+2. ✅ `GoogleService-Info.plist` added to app target
+3. ✅ `PlaySnapApp.swift` running in `.firebasePrepared`
+4. **You** → In Firebase Console, enable Email/Password auth provider if not done
+5. **You** → In Firebase Console, create the Firestore database, set rules to allow authenticated reads/writes
+6. **You** → Configure App Groups capability in Xcode (`group.com.playsnap.shared`) for both app and widget targets
+7. Test email sign-in end to end: sign up → profile setup → squad setup → main tab
+8. Verify `users/{uid}` document is created in Firestore after sign-in
+9. Implement [FirebaseSquadService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/) — create/join squad in Firestore (Milestone 2)
 
-Right now, the remaining setup gaps are external configuration:
+## 10. Remaining setup gaps
 
-- no `.entitlements` files are committed yet for App Groups
-- Apple auth still depends on Firebase Console provider setup
-- Firestore must exist in the Firebase project before the profile/session flow can persist data
+| Gap | Blocker |
+|-----|---------|
+| App Groups capability not configured in Xcode | Widget data sharing won't work until this is done |
+| Push Notifications capability missing | Requires paid Apple Developer account |
+| Phone auth not testable | Requires real device + APNS token |
+| Apple Sign In parked | Requires paid Apple Developer account + Push Notifications capability |
+| `FirebaseSquadService` not implemented | Squad data is stub-only (in-memory, not persisted to Firestore) |
+| `FirebasePlayService` not implemented | Feed data is stub-only |
+| `FirebaseStorageService.uploadPhoto/Video/Avatar` not implemented | Upload pipeline is Milestone 3 |

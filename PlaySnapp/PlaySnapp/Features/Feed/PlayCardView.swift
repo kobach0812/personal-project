@@ -50,7 +50,7 @@ struct PlayCardView: View {
             }
 
             HStack(spacing: 10) {
-                ForEach(["🔥", "💪", "👏"], id: \.self) { emoji in
+                ForEach(PlayReaction.availableEmojis, id: \.self) { emoji in
                     Button {
                         onReact(emoji)
                     } label: {
