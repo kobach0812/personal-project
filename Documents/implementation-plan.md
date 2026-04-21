@@ -174,16 +174,13 @@ Tasks:
 - ✅ App Groups capability in both debug entitlements + release entitlements
 - ✅ Fixed suite name mismatch (`playsnap` → `playsnapp`)
 - ✅ Switched from `UserDefaults(suiteName:)` to `FileManager` container (avoids `cfprefsd` error)
-- ⚠️ On-device data sharing not verified — `containerURL(forSecurityApplicationGroupIdentifier:)` may return nil if provisioning profile hasn't picked up the App Group capability yet
+- ✅ Switched to local thumbnail file (`latest_thumbnail.jpg` in App Group container via `AppGroupStore`) — avoids `AsyncImage` remote loading failures in widget sandbox
+- ✅ `WidgetThumbnailRenderer` downsizes captured photo to 600px JPEG before saving
 - ⚠️ Widget setup education screen — deferred to Milestone 9 polish
 
 Done when:
-- Widget renders the latest squad play photo after posting ← blocked on device provisioning
+- ✅ Widget renders the latest squad play photo after posting
 - ✅ Widget handles empty state safely (shows gradient placeholder)
-
-Notes:
-- Testing on iPhone 11; widget UI works but payload not yet reaching widget
-- To unblock: in Xcode → both targets → Signing & Capabilities → App Groups → verify checkmark on `group.com.playsnapp.shared`, then clean build + reinstall
 
 ### Milestone 8: Video support
 
