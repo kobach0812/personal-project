@@ -204,9 +204,13 @@ Required fields:
 - `name`
 - `primarySport`
 - `avatarURL`
-- `squadId`
+- `squadIDs` — array of squads the user belongs to (see M12)
+- `activeSquadID` — currently selected squad; drives feed/camera/game/widget (see M12)
 - `createdAt`
 - `updatedAt`
+
+Deprecated (retained read-only for one release during M12 migration):
+- `squadId` — legacy single-squad field
 
 ### Squad
 
@@ -284,14 +288,22 @@ Recommended schema:
 users/{userId}
 users/{userId}/devices/{deviceId}
 users/{userId}/notifications/{notificationId}
+users/{userId}/memberships/{squadId}                        # M12
+users/{userId}/friends/{friendUserId}                       # M11
 
 squads/{squadId}
 squads/{squadId}/members/{userId}
 squads/{squadId}/plays/{playId}
 squads/{squadId}/plays/{playId}/reactions/{userId}
+squads/{squadId}/tournaments/{sessionId}                    # M10 / M13
+squads/{squadId}/tournaments/{sessionId}/matches/{matchId}  # M13
+squads/{squadId}/leaderboard/{userId}                       # M10
 
+friendRequests/{requestId}                                  # M11; id = "fromUid_toUid"
 invites/{inviteCode}
 ```
+
+See implementation-plan.md for field-level details on the M11/M12/M13 collections.
 
 Why this shape:
 
@@ -346,8 +358,9 @@ Important rule:
 1. User enters squad name
 2. App creates `squads/{squadId}`
 3. App creates `squads/{squadId}/members/{uid}`
-4. App updates `users/{uid}.squadId`
-5. App creates `invites/{inviteCode}`
+4. App appends to `users/{uid}.squadIDs` and sets `activeSquadID` if first squad
+5. App creates `users/{uid}/memberships/{squadId}`
+6. App creates `invites/{inviteCode}`
 
 ### Join squad
 
@@ -355,12 +368,13 @@ Important rule:
 2. App resolves `invites/{inviteCode}`
 3. App verifies invite is active
 4. App writes membership document
-5. App updates `users/{uid}.squadId`
-6. App increments squad member count transactionally
+5. App appends squad to `users/{uid}.squadIDs`; sets `activeSquadID` if first squad
+6. App creates `users/{uid}/memberships/{squadId}`
+7. App increments squad member count transactionally
 
 For MVP:
 
-- One squad per user
+- Users may belong to multiple squads; exactly one is active at a time
 - One active invite code per squad is enough
 
 ## 11. Photo upload flow
@@ -409,9 +423,10 @@ Critical note:
 
 Feed listener should subscribe to:
 
-- `squads/{squadId}/plays`
+- `squads/{activeSquadID}/plays`
 - ordered by `createdAt desc`
 - paginated if needed later
+- re-bound when the user switches active squad (M12)
 
 ### Reactions
 
@@ -551,7 +566,11 @@ Recommended order for a real MVP:
 7. Push notifications
 8. Widget cache and widget UI
 9. Video capture and upload
-10. TestFlight, analytics, polish
+10. Fair-play rotation tournament / Game tab (M10)
+11. Friends graph (M11)
+12. Multi-squad membership (M12)
+13. Multi-session Game + roster picker + Firestore match history (M13)
+14. TestFlight, analytics, polish
 
 Why this order:
 
@@ -564,7 +583,7 @@ Why this order:
 These are the strongest decisions to lock now:
 
 - Ship with `Sign in with Apple` as the primary auth method once a paid developer account is active; email/phone is the current working substitute
-- Support one squad per user
+- Support multiple squads per user with a single "active" squad driving feed / camera / widget (M12)
 - Start with photo first if video slows camera delivery
 - Use reactions only, no comments
 - Treat widget freshness as a differentiator, but not as the only notification path

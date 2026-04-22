@@ -8,12 +8,11 @@ actor StubSquadService: SquadServicing {
         self.sessionStore = sessionStore
     }
 
-    func createSquad(name: String, sport: Sport) async throws -> Squad {
+    func createSquad(name: String) async throws -> Squad {
         let userID = await sessionStore.currentUserID() ?? UUID().uuidString
         let squad = Squad(
             id: UUID().uuidString,
             name: name,
-            sport: sport,
             createdBy: userID,
             memberIDs: [userID],
             inviteCode: String(name.prefix(4)).uppercased() + "1",
@@ -29,8 +28,7 @@ actor StubSquadService: SquadServicing {
         let userID = await sessionStore.currentUserID() ?? UUID().uuidString
         let squad = Squad(
             id: "joined-squad",
-            name: "Local Run Club",
-            sport: .running,
+            name: "Tuesday Badminton",
             createdBy: "user-4",
             memberIDs: [userID, "user-4"],
             inviteCode: inviteCode.uppercased(),

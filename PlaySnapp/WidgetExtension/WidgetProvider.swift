@@ -21,7 +21,6 @@ struct WidgetProvider: TimelineProvider {
             playID: "sample-play",
             squadID: "sample-squad",
             senderName: "Maya",
-            sportName: "Football",
             createdAt: .now,
             thumbnailURL: nil
         )

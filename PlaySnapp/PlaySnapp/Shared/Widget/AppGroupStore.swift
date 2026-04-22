@@ -7,7 +7,6 @@ struct WidgetPayload: Codable, Equatable, Sendable {
     let playID: String
     let squadID: String
     let senderName: String
-    let sportName: String
     let createdAt: Date
     let thumbnailURL: URL?
 }

@@ -12,14 +12,10 @@ actor FirebaseOnboardingProgressService: OnboardingProgressServicing {
         self.sessionStore = sessionStore
     }
 
-    func completeProfile(name: String, sport: Sport) async throws -> AppSession {
+    func completeProfile(name: String) async throws -> AppSession {
         let currentUser = try await requireCurrentUser()
         try await authGateway.updateCurrentUserDisplayName(name)
-        return try await sessionStore.completeProfile(
-            userID: currentUser.id,
-            name: name,
-            sport: sport
-        )
+        return try await sessionStore.completeProfile(userID: currentUser.id, name: name)
     }
 
     func markJoinedSquad() async throws -> AppSession {

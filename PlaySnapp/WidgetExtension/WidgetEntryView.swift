@@ -10,7 +10,7 @@ struct WidgetEntryView: View {
             Text(entry.payload?.senderName ?? "No plays yet")
                 .font(.headline)
                 .foregroundStyle(.white)
-            Text(entry.payload?.sportName ?? "PlaySnapp")
+            Text("PlaySnapp")
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.82))
         }

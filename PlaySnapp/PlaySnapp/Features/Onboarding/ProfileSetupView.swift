@@ -10,12 +10,6 @@ struct ProfileSetupView: View {
             Form {
                 Section("Profile") {
                     TextField("Name", text: $viewModel.name)
-
-                    Picker("Primary sport", selection: $viewModel.selectedSport) {
-                        ForEach(Sport.allCases) { sport in
-                            Text(sport.displayName).tag(sport)
-                        }
-                    }
                 }
 
                 Section {

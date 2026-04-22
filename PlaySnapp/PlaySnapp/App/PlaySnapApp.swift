@@ -65,17 +65,23 @@ private struct MainShellView: View {
 
     var body: some View {
         TabView(selection: $router.selectedTab) {
-            CameraView()
-                .tabItem {
-                    Label("Camera", systemImage: "camera.fill")
-                }
-                .tag(MainTab.camera)
-
             FeedView()
                 .tabItem {
                     Label("Feed", systemImage: "rectangle.stack.fill")
                 }
                 .tag(MainTab.feed)
+
+            TournamentView()
+                .tabItem {
+                    Label("Game", systemImage: "sportscourt.fill")
+                }
+                .tag(MainTab.game)
+
+            CameraView()
+                .tabItem {
+                    Label("Camera", systemImage: "camera.fill")
+                }
+                .tag(MainTab.camera)
 
             NotificationsView()
                 .tabItem {

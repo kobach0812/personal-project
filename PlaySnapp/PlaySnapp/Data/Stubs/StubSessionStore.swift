@@ -60,7 +60,7 @@ actor StubSessionStore {
         currentUser
     }
 
-    func completeProfile(name: String, sport: Sport) throws -> AppSession {
+    func completeProfile(name: String) throws -> AppSession {
         guard var currentSession = session else {
             throw AuthServiceError.missingSession
         }
@@ -72,7 +72,6 @@ actor StubSessionStore {
         currentUser = AppUser(
             id: currentSession.userID,
             name: name,
-            primarySport: sport,
             avatarURL: currentUser?.avatarURL,
             squadID: currentUser?.squadID,
             createdAt: currentUser?.createdAt ?? now,
@@ -102,14 +101,12 @@ actor StubSessionStore {
         return currentSession
     }
 
-    /// Updates name and sport on an already-onboarded user without touching session flags.
-    func updateProfile(name: String, sport: Sport) throws -> AppUser {
+    func updateProfile(name: String) throws -> AppUser {
         guard var currentUser else {
             throw AuthServiceError.missingSession
         }
 
         currentUser.name = name
-        currentUser.primarySport = sport
         currentUser.updatedAt = Date()
         self.currentUser = currentUser
         return currentUser
@@ -152,7 +149,6 @@ private extension StubSessionStore {
         currentUser = AppUser(
             id: userID,
             name: existingUser?.name ?? "",
-            primarySport: existingUser?.primarySport ?? .football,
             avatarURL: existingUser?.avatarURL,
             squadID: existingUser?.squadID,
             createdAt: existingUser?.createdAt ?? now,

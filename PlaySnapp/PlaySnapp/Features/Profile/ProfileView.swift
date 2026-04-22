@@ -10,7 +10,6 @@ struct ProfileView: View {
             List {
                 Section("Player") {
                     LabeledContent("Name", value: viewModel.user?.name ?? "Not set")
-                    LabeledContent("Sport", value: viewModel.user?.primarySport.displayName ?? "Not set")
                     LabeledContent("Squad", value: viewModel.squad?.name ?? "No squad")
                 }
 

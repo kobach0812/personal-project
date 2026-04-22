@@ -7,8 +7,8 @@ actor StubOnboardingProgressService: OnboardingProgressServicing {
         self.sessionStore = sessionStore
     }
 
-    func completeProfile(name: String, sport: Sport) async throws -> AppSession {
-        try await sessionStore.completeProfile(name: name, sport: sport)
+    func completeProfile(name: String) async throws -> AppSession {
+        try await sessionStore.completeProfile(name: name)
     }
 
     func markJoinedSquad() async throws -> AppSession {

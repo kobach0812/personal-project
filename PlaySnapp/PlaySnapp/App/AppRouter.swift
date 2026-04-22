@@ -15,6 +15,7 @@ enum MainTab: Hashable {
     case feed
     case notifications
     case profile
+    case game
 }
 
 @MainActor

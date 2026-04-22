@@ -76,7 +76,6 @@ struct CapturePreviewView: View {
                 playID: play.id,
                 squadID: play.squadID,
                 senderName: play.senderName,
-                sportName: squad.sport.displayName,
                 createdAt: play.createdAt,
                 thumbnailURL: play.mediaURL
             )

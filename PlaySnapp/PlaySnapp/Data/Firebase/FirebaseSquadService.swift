@@ -15,7 +15,7 @@ actor FirebaseSquadService: SquadServicing {
         self.authGateway = authGateway
     }
 
-    func createSquad(name: String, sport: Sport) async throws -> Squad {
+    func createSquad(name: String) async throws -> Squad {
         #if canImport(FirebaseFirestore)
         let user = try await requireCurrentUser()
 
@@ -25,7 +25,6 @@ actor FirebaseSquadService: SquadServicing {
         let squadData: [String: Any] = [
             "id": squadID,
             "name": name,
-            "sport": sport.rawValue,
             "createdBy": user.id,
             "memberIDs": [user.id],
             "inviteCode": inviteCode,
@@ -40,7 +39,6 @@ actor FirebaseSquadService: SquadServicing {
         return Squad(
             id: squadID,
             name: name,
-            sport: sport,
             createdBy: user.id,
             memberIDs: [user.id],
             inviteCode: inviteCode,
@@ -131,7 +129,6 @@ private extension FirebaseSquadService {
         return Squad(
             id: squadID,
             name: data["name"] as? String ?? "Squad",
-            sport: Sport(rawValue: data["sport"] as? String ?? "") ?? .football,
             createdBy: data["createdBy"] as? String ?? "",
             memberIDs: memberIDs,
             inviteCode: data["inviteCode"] as? String ?? "",

@@ -20,10 +20,10 @@ actor FirebaseUserProfileService: UserProfileServicing {
         return try await sessionStore.fetchCurrentUser(for: currentUser)
     }
 
-    func updateProfile(name: String, sport: Sport) async throws -> AppUser {
+    func updateProfile(name: String) async throws -> AppUser {
         let currentUser = try await requireCurrentUser()
         try await authGateway.updateCurrentUserDisplayName(name)
-        return try await sessionStore.updateProfile(userID: currentUser.id, name: name, sport: sport)
+        return try await sessionStore.updateProfile(userID: currentUser.id, name: name)
     }
 
     func updateAvatar(url: URL) async throws -> AppUser {

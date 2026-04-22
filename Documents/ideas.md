@@ -56,10 +56,10 @@ Will sports players share moments with their squad and come back daily?
 - Local copy removed after successful upload
 - No filters or editing
 
-3. Squad
+3. Squads
 - Create a squad or join by invite link
-- Start with one squad per user
-- Keep squad small and private
+- A user can belong to multiple squads; one is active at a time (see plan M12)
+- Keep each squad small and private
 
 4. Squad feed
 - Reverse chronological feed
@@ -77,10 +77,9 @@ Will sports players share moments with their squad and come back daily?
 ### Out of scope
 
 - Discovery map
-- Open game invites
+- Open game invites (to strangers)
 - Comments
-- Stats and history
-- Multiple squads
+- Stats and history beyond the per-squad leaderboard
 - Advanced sport tagging
 - In-app messaging
 

@@ -19,13 +19,11 @@ actor FirebaseSessionDocumentStore {
 
     func completeProfile(
         userID: String,
-        name: String,
-        sport: Sport
+        name: String
     ) async throws -> AppSession {
         let document = try await mergeDocument(
             fields: [
                 "name": name,
-                "primarySport": sport.rawValue,
                 "hasCompletedProfile": true,
             ],
             for: userID
@@ -57,9 +55,9 @@ actor FirebaseSessionDocumentStore {
         return appUser(from: document, userID: user.id, fallbackDisplayName: user.displayName, fallbackPhotoURL: user.photoURL)
     }
 
-    func updateProfile(userID: String, name: String, sport: Sport) async throws -> AppUser {
+    func updateProfile(userID: String, name: String) async throws -> AppUser {
         let document = try await mergeDocument(
-            fields: ["name": name, "primarySport": sport.rawValue],
+            fields: ["name": name],
             for: userID
         )
 
@@ -135,7 +133,6 @@ private extension FirebaseSessionDocumentStore {
     ) -> AppUser {
         let rawName = data["name"] as? String
         let resolvedName = rawName?.isEmpty == false ? rawName : fallbackDisplayName
-        let rawSport = data["primarySport"] as? String
         let avatarString = (data["avatarURL"] as? String) ?? fallbackPhotoURL?.absoluteString
 
         #if canImport(FirebaseFirestore)
@@ -149,7 +146,6 @@ private extension FirebaseSessionDocumentStore {
         return AppUser(
             id: userID,
             name: resolvedName ?? "Player",
-            primarySport: Sport(rawValue: rawSport ?? "") ?? .football,
             avatarURL: avatarString.flatMap(URL.init(string:)),
             squadID: data["squadID"] as? String,
             createdAt: createdAt,

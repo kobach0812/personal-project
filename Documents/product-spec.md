@@ -35,7 +35,6 @@ PlaySnap makes a sports player's latest moment appear on their squadmates' home 
 - Comments
 - Direct messaging
 - Public profiles
-- Multiple squads
 - Editing tools and filters
 - Long-form media or stats tracking
 
@@ -133,8 +132,10 @@ Join squad flow:
 - Confirm squad name before joining
 
 Rules:
-- One squad per user in MVP
+- A user may belong to multiple squads (see implementation-plan.md M12). Exactly one squad is "active" at a time and drives Feed / Camera / Game / widget.
 - Squad membership is required before posting
+- First squad created or joined becomes the initial active squad
+- Squad switcher lives in the main nav bar
 
 Next step:
 - Show Widget Setup Help
@@ -233,7 +234,7 @@ Primary actions:
 Rules:
 - No algorithmic ranking
 - No comments in MVP
-- Feed is limited to the user's single squad
+- Feed is scoped to the user's currently active squad (switching squads reloads the feed)
 
 Next step:
 - Open Full-Screen Post Viewer
@@ -283,7 +284,8 @@ Content:
 - Profile photo
 - Name
 - Sport
-- Squad name
+- Squads (list of memberships; tap to switch active squad)
+- Friends (entry to friend list + search; see M11)
 - Invite squadmates action
 - Widget help entry
 - Notification preferences

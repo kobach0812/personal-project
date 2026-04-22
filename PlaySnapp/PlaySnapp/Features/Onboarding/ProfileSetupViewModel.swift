@@ -4,7 +4,6 @@ import Foundation
 @MainActor
 final class ProfileSetupViewModel: ObservableObject {
     @Published var name = ""
-    @Published var selectedSport: Sport = .football
     @Published var isSaving = false
     @Published var errorMessage: String?
 
@@ -30,8 +29,7 @@ final class ProfileSetupViewModel: ObservableObject {
 
         do {
             let session = try await progressService.completeProfile(
-                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                sport: selectedSport
+                name: name.trimmingCharacters(in: .whitespacesAndNewlines)
             )
             router.handleSessionUpdate(session)
         } catch {

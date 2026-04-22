@@ -79,7 +79,7 @@ final class SquadSetupViewModel: ObservableObject {
             let squad: Squad
             switch mode {
             case .create:
-                squad = try await squadService.createSquad(name: normalizedInput, sport: .football)
+                squad = try await squadService.createSquad(name: normalizedInput)
             case .join:
                 squad = try await squadService.joinSquad(inviteCode: normalizedInput)
             }

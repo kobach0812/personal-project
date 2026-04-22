@@ -4,7 +4,6 @@ enum AppFixtures {
     nonisolated static let sampleUser = AppUser(
         id: "user-1",
         name: "Alex Carter",
-        primarySport: .football,
         avatarURL: nil,
         squadID: "squad-1",
         createdAt: .now,
@@ -13,8 +12,7 @@ enum AppFixtures {
 
     nonisolated static let sampleSquad = Squad(
         id: "squad-1",
-        name: "Tuesday Five-a-Side",
-        sport: .football,
+        name: "Tuesday Badminton",
         createdBy: "user-1",
         memberIDs: ["user-1", "user-2", "user-3"],
         inviteCode: "PLAY5",
