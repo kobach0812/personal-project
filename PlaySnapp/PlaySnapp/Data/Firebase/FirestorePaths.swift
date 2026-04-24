@@ -61,6 +61,14 @@ enum FirestorePaths {
         "\(tournaments(squadID))/\(sessionID)"
     }
 
+    static func matches(_ squadID: String, _ sessionID: String) -> String {
+        "\(tournament(squadID, sessionID))/matches"
+    }
+
+    static func match(_ squadID: String, _ sessionID: String, _ matchID: String) -> String {
+        "\(matches(squadID, sessionID))/\(matchID)"
+    }
+
     static func leaderboard(_ squadID: String) -> String {
         "\(squad(squadID))/leaderboard"
     }

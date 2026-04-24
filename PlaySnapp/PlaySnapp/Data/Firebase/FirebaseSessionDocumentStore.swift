@@ -64,6 +64,16 @@ actor FirebaseSessionDocumentStore {
         return appUser(from: document, userID: userID, fallbackDisplayName: name)
     }
 
+    func fetchUser(id: String) async throws -> AppUser? {
+        #if canImport(FirebaseFirestore)
+        let doc = try await firestore.document(FirestorePaths.user(id)).getDocument()
+        guard let data = doc.data() else { return nil }
+        return appUser(from: data, userID: id)
+        #else
+        throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseFirestore")
+        #endif
+    }
+
     func updateAvatar(userID: String, url: URL) async throws -> AppUser {
         let document = try await mergeDocument(
             fields: ["avatarURL": url.absoluteString],

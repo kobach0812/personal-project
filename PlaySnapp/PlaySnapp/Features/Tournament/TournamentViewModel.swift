@@ -4,19 +4,23 @@ import SwiftUI
 @MainActor
 final class TournamentViewModel: ObservableObject {
     @Published var session: TournamentSession?
-    @Published var squad: Squad?
     @Published var currentUser: AppUser?
     @Published var isLoading = false
     @Published var errorMessage: String?
 
-    // Setup form state
-    @Published var courts = 2
-    @Published var setupPlayers: [TournamentPlayer] = []
-    @Published var newPlayerName = ""
-
     var isOrganizer: Bool {
         guard let session, let user = currentUser else { return false }
         return session.createdBy == user.id
+    }
+
+    /// Non-nil when the current user has a linked player in the active round.
+    var participantBannerText: String? {
+        guard let session, let user = currentUser else { return nil }
+        guard let myPlayer = session.players.first(where: { $0.userID == user.id }) else { return nil }
+        guard let match = session.currentRound.first(where: {
+            $0.teamA.contains(myPlayer.id) || $0.teamB.contains(myPlayer.id)
+        }) else { return nil }
+        return "You're on Court \(match.court)"
     }
 
     var billboardPlayers: [TournamentPlayer] {
@@ -38,50 +42,18 @@ final class TournamentViewModel: ObservableObject {
         session?.players.first { $0.id == id }?.name ?? id
     }
 
-    // MARK: - Actions
+    // MARK: - Session Loading
 
-    func load(
-        userProfileService: UserProfileServicing,
-        squadService: SquadServicing,
-        tournamentService: TournamentServicing
-    ) async {
-        isLoading = true
-        defer { isLoading = false }
-        async let user = try? userProfileService.fetchCurrentUser()
-        async let squad = try? squadService.fetchCurrentSquad()
-        currentUser = await user
-        self.squad = await squad
-        guard let squadID = self.squad?.id else { return }
-        session = try? await tournamentService.fetchActiveSession(squadID: squadID)
-    }
-
-    func addSetupPlayer() {
-        let name = newPlayerName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
-        setupPlayers.append(TournamentPlayer(id: UUID().uuidString, name: name, userID: nil, played: 0, wins: 0, losses: 0, lastPlayedAt: 0))
-        newPlayerName = ""
-    }
-
-    func removeSetupPlayer(at offsets: IndexSet) {
-        setupPlayers.remove(atOffsets: offsets)
-    }
-
-    func startSession(tournamentService: TournamentServicing) async {
-        guard let squad, let user = currentUser else { return }
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-        do {
-            session = try await tournamentService.createSession(
-                squadID: squad.id,
-                createdBy: user.id,
-                courts: courts,
-                players: setupPlayers
-            )
-        } catch {
-            errorMessage = "Could not start session."
+    /// Initialise the VM with a specific session and fetch its completed matches.
+    func loadSession(_ session: TournamentSession, currentUser: AppUser?, tournamentService: TournamentServicing) async {
+        self.session = session
+        self.currentUser = currentUser
+        if let matches = try? await tournamentService.fetchMatches(squadID: session.squadID, sessionID: session.id) {
+            self.session?.completedMatches = matches
         }
     }
+
+    // MARK: - Actions
 
     func recordResult(matchID: String, winner: WinnerTeam, scoreA: Int?, scoreB: Int?, tournamentService: TournamentServicing) async {
         guard let session else { return }
@@ -98,9 +70,7 @@ final class TournamentViewModel: ObservableObject {
         defer { isLoading = false }
         do {
             try await tournamentService.endSession(session)
-            self.session = nil
-            setupPlayers = []
-            courts = 2
+            self.session?.status = .finished
         } catch {
             errorMessage = "Could not end session."
         }

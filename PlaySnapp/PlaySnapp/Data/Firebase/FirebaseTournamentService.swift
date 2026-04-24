@@ -10,7 +10,7 @@ actor FirebaseTournamentService: TournamentServicing {
     private let firestore = Firestore.firestore()
     #endif
 
-    func createSession(squadID: String, createdBy: String, courts: Int, players: [TournamentPlayer]) async throws -> TournamentSession {
+    func createSession(squadID: String, createdBy: String, title: String, courts: Int, players: [TournamentPlayer]) async throws -> TournamentSession {
         #if canImport(FirebaseFirestore)
         let sessionID = UUID().uuidString
         var session = TournamentSession(
@@ -18,6 +18,7 @@ actor FirebaseTournamentService: TournamentServicing {
             squadID: squadID,
             createdBy: createdBy,
             createdAt: .now,
+            title: title,
             status: .active,
             courts: courts,
             players: players,
@@ -25,7 +26,8 @@ actor FirebaseTournamentService: TournamentServicing {
             roundNumber: 0,
             matchCounter: 0,
             completedMatches: [],
-            partnerships: [:]
+            partnerships: [:],
+            participantUserIDs: players.compactMap(\.userID)
         )
         session.currentRound = TournamentRotationEngine.fillAllCourts(session: session)
         try await firestore
@@ -43,9 +45,7 @@ actor FirebaseTournamentService: TournamentServicing {
         updated.currentRound = TournamentRotationEngine.fillAllCourts(session: updated)
         try await firestore
             .document(FirestorePaths.tournament(session.squadID, session.id))
-            .updateData([
-                "currentRound": updated.currentRound.map(matchToDict)
-            ])
+            .updateData(["currentRound": updated.currentRound.map(matchToDict)])
         return updated
         #else
         throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseFirestore")
@@ -83,6 +83,7 @@ actor FirebaseTournamentService: TournamentServicing {
 
         let batch = firestore.batch()
 
+        // Update session document
         let sessionRef = firestore.document(FirestorePaths.tournament(session.squadID, session.id))
         batch.updateData([
             "currentRound": updated.currentRound.map(matchToDict),
@@ -91,6 +92,11 @@ actor FirebaseTournamentService: TournamentServicing {
             "matchCounter": updated.matchCounter
         ], forDocument: sessionRef)
 
+        // Persist completed match to subcollection
+        let matchRef = firestore.document(FirestorePaths.match(session.squadID, session.id, archived.id))
+        batch.setData(matchToDict(archived), forDocument: matchRef)
+
+        // Update leaderboard entries for linked players
         for id in winnerIDs + loserIDs {
             guard let player = updated.players.first(where: { $0.id == id }),
                   let userID = player.userID else { continue }
@@ -121,14 +127,30 @@ actor FirebaseTournamentService: TournamentServicing {
         #endif
     }
 
-    func fetchActiveSession(squadID: String) async throws -> TournamentSession? {
+    /// Returns all sessions for the squad, active ones first, then by createdAt descending.
+    func fetchSessions(squadID: String) async throws -> [TournamentSession] {
         #if canImport(FirebaseFirestore)
         let snapshot = try await firestore
             .collection(FirestorePaths.tournaments(squadID))
-            .whereField("status", isEqualTo: TournamentStatus.active.rawValue)
-            .limit(to: 1)
             .getDocuments()
-        return snapshot.documents.first.flatMap { sessionFrom($0.data(), sessionID: $0.documentID) }
+        let sessions = snapshot.documents.compactMap { sessionFrom($0.data(), sessionID: $0.documentID) }
+        return sessions.sorted { lhs, rhs in
+            if (lhs.status == .active) != (rhs.status == .active) { return lhs.status == .active }
+            return lhs.createdAt > rhs.createdAt
+        }
+        #else
+        throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseFirestore")
+        #endif
+    }
+
+    /// Fetches completed matches from the persistent `matches` subcollection, newest first.
+    func fetchMatches(squadID: String, sessionID: String) async throws -> [TournamentMatch] {
+        #if canImport(FirebaseFirestore)
+        let snapshot = try await firestore
+            .collection(FirestorePaths.matches(squadID, sessionID))
+            .order(by: "completedAt", descending: true)
+            .getDocuments()
+        return snapshot.documents.compactMap { matchFrom($0.data()) }
         #else
         throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseFirestore")
         #endif
@@ -153,7 +175,10 @@ private extension FirebaseTournamentService {
             "id": m.id, "court": m.court,
             "teamA": m.teamA, "teamB": m.teamB
         ]
-        if let w = m.winnerTeam { d["winnerTeam"] = w.rawValue }
+        if let w = m.winnerTeam   { d["winnerTeam"] = w.rawValue }
+        if let a = m.teamAScore   { d["teamAScore"] = a }
+        if let b = m.teamBScore   { d["teamBScore"] = b }
+        if let t = m.completedAt  { d["completedAt"] = t }
         return d
     }
 
@@ -163,13 +188,15 @@ private extension FirebaseTournamentService {
             "squadID": s.squadID,
             "createdBy": s.createdBy,
             "createdAt": s.createdAt,
+            "title": s.title,
             "status": s.status.rawValue,
             "courts": s.courts,
             "roundNumber": s.roundNumber,
             "matchCounter": s.matchCounter,
             "players": s.players.map(playerToDict),
             "currentRound": s.currentRound.map(matchToDict),
-            "partnerships": s.partnerships
+            "partnerships": s.partnerships,
+            "participantUserIDs": s.participantUserIDs
         ]
     }
 
@@ -193,7 +220,10 @@ private extension FirebaseTournamentService {
               let teamB = d["teamB"] as? [String] else { return nil }
         return TournamentMatch(
             id: id, court: court, teamA: teamA, teamB: teamB,
-            winnerTeam: (d["winnerTeam"] as? String).flatMap(WinnerTeam.init)
+            winnerTeam: (d["winnerTeam"] as? String).flatMap(WinnerTeam.init),
+            teamAScore: d["teamAScore"] as? Int,
+            teamBScore: d["teamBScore"] as? Int,
+            completedAt: (d["completedAt"] as? Timestamp)?.dateValue()
         )
     }
 
@@ -207,6 +237,7 @@ private extension FirebaseTournamentService {
             squadID: squadID,
             createdBy: createdBy,
             createdAt: (d["createdAt"] as? Timestamp)?.dateValue() ?? .now,
+            title: d["title"] as? String ?? "",
             status: status,
             courts: d["courts"] as? Int ?? 1,
             players: (d["players"] as? [[String: Any]] ?? []).compactMap(playerFrom),
@@ -214,7 +245,8 @@ private extension FirebaseTournamentService {
             roundNumber: d["roundNumber"] as? Int ?? 0,
             matchCounter: d["matchCounter"] as? Int ?? 0,
             completedMatches: [],
-            partnerships: d["partnerships"] as? [String: [String: Int]] ?? [:]
+            partnerships: d["partnerships"] as? [String: [String: Int]] ?? [:],
+            participantUserIDs: d["participantUserIDs"] as? [String] ?? []
         )
     }
     #endif

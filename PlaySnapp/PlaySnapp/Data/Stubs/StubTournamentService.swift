@@ -1,12 +1,15 @@
 import Foundation
 
 actor StubTournamentService: TournamentServicing {
-    func createSession(squadID: String, createdBy: String, courts: Int, players: [TournamentPlayer]) async throws -> TournamentSession {
+    private var sessions: [TournamentSession] = []
+
+    func createSession(squadID: String, createdBy: String, title: String, courts: Int, players: [TournamentPlayer]) async throws -> TournamentSession {
         var session = TournamentSession(
             id: UUID().uuidString,
             squadID: squadID,
             createdBy: createdBy,
             createdAt: .now,
+            title: title,
             status: .active,
             courts: courts,
             players: players,
@@ -14,15 +17,18 @@ actor StubTournamentService: TournamentServicing {
             roundNumber: 0,
             matchCounter: 0,
             completedMatches: [],
-            partnerships: [:]
+            partnerships: [:],
+            participantUserIDs: players.compactMap(\.userID)
         )
         session.currentRound = TournamentRotationEngine.fillAllCourts(session: session)
+        sessions.append(session)
         return session
     }
 
     func generateNextRound(for session: TournamentSession) async throws -> TournamentSession {
         var updated = session
         updated.currentRound = TournamentRotationEngine.fillAllCourts(session: updated)
+        upsert(updated)
         return updated
     }
 
@@ -50,10 +56,34 @@ actor StubTournamentService: TournamentServicing {
         if let next = TournamentRotationEngine.generateMatchForCourt(court: match.court, session: updated) {
             updated.currentRound.append(next)
         }
+        upsert(updated)
         return updated
     }
 
-    func endSession(_ session: TournamentSession) async throws {}
+    func endSession(_ session: TournamentSession) async throws {
+        var finished = session
+        finished.status = .finished
+        upsert(finished)
+    }
 
-    func fetchActiveSession(squadID: String) async throws -> TournamentSession? { nil }
+    func fetchSessions(squadID: String) async throws -> [TournamentSession] {
+        sessions
+            .filter { $0.squadID == squadID }
+            .sorted { lhs, rhs in
+                if (lhs.status == .active) != (rhs.status == .active) { return lhs.status == .active }
+                return lhs.createdAt > rhs.createdAt
+            }
+    }
+
+    func fetchMatches(squadID: String, sessionID: String) async throws -> [TournamentMatch] {
+        sessions.first(where: { $0.id == sessionID })?.completedMatches ?? []
+    }
+
+    // MARK: - Private
+
+    private func upsert(_ session: TournamentSession) {
+        if let i = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[i] = session
+        }
+    }
 }
