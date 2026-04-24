@@ -5,7 +5,7 @@ enum AppFixtures {
         id: "user-1",
         name: "Alex Carter",
         avatarURL: nil,
-        squadID: "squad-1",
+        activeSquadID: "squad-1",
         createdAt: .now,
         updatedAt: .now
     )

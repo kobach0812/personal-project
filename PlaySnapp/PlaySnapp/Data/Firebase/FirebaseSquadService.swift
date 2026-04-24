@@ -33,7 +33,14 @@ actor FirebaseSquadService: SquadServicing {
 
         let batch = firestore.batch()
         batch.setData(squadData, forDocument: firestore.document(FirestorePaths.squad(squadID)))
-        batch.setData(["squadID": squadID], forDocument: firestore.document(FirestorePaths.user(user.id)), merge: true)
+        batch.setData(
+            [
+                "squadIDs": FieldValue.arrayUnion([squadID]),
+                "activeSquadID": squadID,
+            ],
+            forDocument: firestore.document(FirestorePaths.user(user.id)),
+            merge: true
+        )
         try await batch.commit()
 
         return Squad(
@@ -72,13 +79,16 @@ actor FirebaseSquadService: SquadServicing {
             forDocument: firestore.document(FirestorePaths.squad(squadID))
         )
         batch.setData(
-            ["squadID": squadID],
+            [
+                "squadIDs": FieldValue.arrayUnion([squadID]),
+                "activeSquadID": squadID,
+            ],
             forDocument: firestore.document(FirestorePaths.user(user.id)),
             merge: true
         )
         try await batch.commit()
 
-        return squad(from: data, squadID: squadID, appendingMemberID: user.id)
+        return Self.squad(from: data, squadID: squadID, appendingMemberID: user.id)
         #else
         throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseFirestore")
         #endif
@@ -89,16 +99,62 @@ actor FirebaseSquadService: SquadServicing {
         let user = try await requireCurrentUser()
 
         let userSnapshot = try await firestore.document(FirestorePaths.user(user.id)).getDocument()
-        guard let squadID = userSnapshot.data()?["squadID"] as? String else {
+        let userData = userSnapshot.data() ?? [:]
+        // Read activeSquadID; fall back to legacy squadID field for existing documents
+        guard let squadID = userData["activeSquadID"] as? String ?? userData["squadID"] as? String else {
             return nil
         }
 
         let squadSnapshot = try await firestore.document(FirestorePaths.squad(squadID)).getDocument()
-        guard let data = squadSnapshot.data() else {
-            return nil
+        guard let data = squadSnapshot.data() else { return nil }
+        return Self.squad(from: data, squadID: squadID)
+        #else
+        throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseFirestore")
+        #endif
+    }
+
+    func fetchAllSquads() async throws -> [Squad] {
+        #if canImport(FirebaseFirestore)
+        let user = try await requireCurrentUser()
+
+        let userSnapshot = try await firestore.document(FirestorePaths.user(user.id)).getDocument()
+        let userData = userSnapshot.data() ?? [:]
+
+        var squadIDs = userData["squadIDs"] as? [String] ?? []
+        // Include legacy single squadID field during migration
+        if let legacyID = userData["squadID"] as? String, !squadIDs.contains(legacyID) {
+            squadIDs.append(legacyID)
         }
 
-        return squad(from: data, squadID: squadID)
+        guard !squadIDs.isEmpty else { return [] }
+
+        // Fetch all squad docs concurrently
+        return try await withThrowingTaskGroup(of: Squad?.self) { group in
+            for id in squadIDs {
+                group.addTask {
+                    let snap = try await self.firestore.document(FirestorePaths.squad(id)).getDocument()
+                    guard let data = snap.data() else { return nil }
+                    return Self.squad(from: data, squadID: id)
+                }
+            }
+            var result: [Squad] = []
+            for try await squad in group {
+                if let squad { result.append(squad) }
+            }
+            return result.sorted { $0.createdAt < $1.createdAt }
+        }
+        #else
+        throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseFirestore")
+        #endif
+    }
+
+    func setActiveSquad(id: String) async throws {
+        #if canImport(FirebaseFirestore)
+        let user = try await requireCurrentUser()
+        try await firestore.document(FirestorePaths.user(user.id)).setData(
+            ["activeSquadID": id],
+            merge: true
+        )
         #else
         throw FirebaseIntegrationError.sdkUnavailable(product: "FirebaseFirestore")
         #endif
@@ -120,12 +176,11 @@ private extension FirebaseSquadService {
     }
 
     #if canImport(FirebaseFirestore)
-    func squad(from data: [String: Any], squadID: String, appendingMemberID: String? = nil) -> Squad {
+    nonisolated static func squad(from data: [String: Any], squadID: String, appendingMemberID: String? = nil) -> Squad {
         var memberIDs = data["memberIDs"] as? [String] ?? []
         if let extra = appendingMemberID, !memberIDs.contains(extra) {
             memberIDs.append(extra)
         }
-
         return Squad(
             id: squadID,
             name: data["name"] as? String ?? "Squad",

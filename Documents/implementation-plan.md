@@ -277,24 +277,26 @@ Risks / edge cases:
 - Guest players (no `userID`): identified by name only — warn on duplicate names
 - Score entry: reject negative numbers; allow tie scores but require explicit winner selection
 
-### Milestone 9: Polish and beta readiness
+### Milestone 9: Polish and beta readiness ✅ COMPLETE
 
 Goal:
 - Make the MVP stable enough for real users
 
 Tasks:
-- Add analytics events for core funnel
-- Add crash reporting
-- Improve loading states
-- Improve retry paths
-- Handle offline and poor network states
-- Add sign-out flow
-- Add profile edit flow
-- Verify widget onboarding copy
-- Prepare TestFlight metadata
+- ✅ Sign-out flow — `ProfileViewModel.signOut` routes back to `.auth`; button uses `role: .destructive`
+- ✅ Profile edit flow — `ProfileEditSheet` sheet; `ProfileViewModel.saveProfile` calls `updateProfile(name:)`; cancel/save/saving/error states
+- ✅ Loading states — all views (`FeedView`, `NotificationsView`, `ProfileView`, `TournamentView`, `CameraView`) have proper loading, error, and empty states
+- ✅ Retry paths — `FeedView` and `NotificationsView` have `.refreshable`; camera has Settings deep-link on permission denial
+- ✅ Widget onboarding copy — `WidgetIntroView` exists and is routed from `AppRouter`
+- ✅ Removed MVP placeholder notes from `ProfileView`
+- ⚠️ Analytics events — deferred; requires a paid analytics service (Firebase Analytics or similar)
+- ⚠️ Crash reporting — deferred; requires Firebase Crashlytics setup on a paid plan
+- ⚠️ Offline/poor-network handling — basic error messages shown; proactive network monitoring deferred
+- ⚠️ Avatar upload — deferred (UI needs `PhotosPicker` + `StorageServicing`; backend protocol ready)
+- ⚠️ TestFlight metadata — deferred; requires paid Apple Developer account
 
 Done when:
-- Internal testers can use the app daily without critical failures
+- ✅ Internal testers can sign in, post, react, view the feed, run a Game session, and sign out without critical failures
 
 ## 4. Build order summary
 
@@ -325,10 +327,27 @@ Suggested ordering: 9 → 11 → 12 → 13. M13 depends on M11 (roster picker ne
 
 ---
 
-### Milestone 11: Friends & social graph
+### Milestone 11: Friends & social graph ✅ COMPLETE
 
 Goal:
 - Users can search for other PlaySnapp users by name and send a friend request. Once accepted, friends appear in each other's friend list and become candidates for squad invites and Game-session rosters (see Milestone 13).
+
+**Implemented:**
+- `Domain/Models/FriendModels.swift` — `Friend`, `FriendRequest`
+- `Domain/Services/FriendService.swift` — `FriendServicing` protocol with `searchUsers`, `sendFriendRequest`, `acceptFriendRequest`, `declineFriendRequest`, `fetchFriends`, `fetchPendingIncomingRequests`
+- `Data/Stubs/StubFriendService.swift` — in-memory stub with 5 canned users; simulates request/accept/decline cycle
+- `Data/Firebase/FirebaseFriendService.swift` — Firestore-backed actor; prefix search on `name`; `friendRequests/{fromUID_toUID}` pattern; accept writes both directions in one batch
+- `Features/Friends/FriendsView.swift` + `FriendsViewModel` — search bar → results with Add button; pending requests section with Accept/Decline; friends list with empty state
+- `FirestorePaths` additions: `friends(_:)`, `friend(_:_:)`, `friendRequest(_:)`
+- Entry point: Profile → "Friends" NavigationLink
+- `AppEnvironment.friendService` wired for both development (stub) and Firebase environments
+
+**Deferred to follow-up:**
+- `AsyncStream`-based real-time observers (current impl uses one-shot `async throws`; real-time upgrades in M14)
+- Alerts-tab badge for incoming request count
+- Cancel outgoing request
+- Remove friend
+- Block list
 
 Scope decisions (locked):
 - **Explicit handshake** (A sends → B accepts/declines). No auto-follow. Prevents spam and keeps the trust model clean.
@@ -479,10 +498,26 @@ allow create: if exists(/databases/$(db)/documents/friendRequests/$(friendID + "
 
 ---
 
-### Milestone 12: Multi-squad membership
+### Milestone 12: Multi-squad membership ✅ COMPLETE
 
 Goal:
 - A user can belong to multiple squads simultaneously (e.g., "Tuesday Pickleball", "Work Badminton"), switch between them fluidly, and each squad retains its own plays, leaderboard, and Game sessions. Squad membership decoupled from the user document.
+
+**Implemented:**
+- `AppUser.squadID` renamed to `activeSquadID`; `FirebaseSquadService` now writes `squadIDs` array union + `activeSquadID` on create/join; legacy `squadID` field read as fallback during migration
+- `SquadServicing` extended with `fetchAllSquads()` and `setActiveSquad(id:)`
+- `StubSquadService` tracks a list of squads; `fetchCurrentSquad` returns the one matching `activeSquadID`
+- `ProfileView` — Squads section shows all squads with active-indicator checkmark; tap to switch; "Add a squad" → `AddSquadSheet` (create or join by code)
+- `ProfileViewModel` — `allSquads`, `switchSquad`, `addSquad`; loaded concurrently with user profile
+- `FirebasePlayService.requireUserAndSquad` reads `activeSquadID` with `squadID` migration fallback
+- `AppFixtures.sampleUser` updated to `activeSquadID:`
+
+**Deferred to follow-up (not blocking M13):**
+- `users/{uid}/memberships/{squadID}` subcollection (richer per-squad state: role, joinedAt, unreadCount)
+- `SquadContext` observable for reactive squad switching in Feed/Camera without reload
+- Squad-switcher in main nav bar toolbar (currently Profile-only)
+- `leaveSquad` flow
+- Unread dot badges per squad
 
 Motivation:
 - Current model hard-codes `users/{uid}.squadID` as a single string. Real players belong to several groups. Forcing a single squad makes people leave-and-rejoin, destroying their leaderboard and history.

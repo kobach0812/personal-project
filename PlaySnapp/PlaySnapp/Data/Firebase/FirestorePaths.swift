@@ -41,6 +41,18 @@ enum FirestorePaths {
         "\(userNotifications(userID))/\(notificationID)"
     }
 
+    static func friends(_ userID: String) -> String {
+        "\(user(userID))/friends"
+    }
+
+    static func friend(_ userID: String, _ friendID: String) -> String {
+        "\(friends(userID))/\(friendID)"
+    }
+
+    static func friendRequest(_ requestID: String) -> String {
+        "friendRequests/\(requestID)"
+    }
+
     static func tournaments(_ squadID: String) -> String {
         "\(squad(squadID))/tournaments"
     }

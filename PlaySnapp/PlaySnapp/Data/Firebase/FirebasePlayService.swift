@@ -110,7 +110,9 @@ private extension FirebasePlayService {
 
         #if canImport(FirebaseFirestore)
         let snapshot = try await firestore.document(FirestorePaths.user(user.id)).getDocument()
-        guard let squadID = snapshot.data()?["squadID"] as? String else {
+        let data = snapshot.data() ?? [:]
+        // Read activeSquadID; fall back to legacy squadID field for existing documents
+        guard let squadID = data["activeSquadID"] as? String ?? data["squadID"] as? String else {
             throw PlayServiceError.noSquad
         }
         return (user, squadID)

@@ -73,7 +73,7 @@ actor StubSessionStore {
             id: currentSession.userID,
             name: name,
             avatarURL: currentUser?.avatarURL,
-            squadID: currentUser?.squadID,
+            activeSquadID: currentUser?.activeSquadID,
             createdAt: currentUser?.createdAt ?? now,
             updatedAt: now
         )
@@ -123,12 +123,9 @@ actor StubSessionStore {
         return currentUser
     }
 
-    func setCurrentSquad(id: String?) {
-        guard var currentUser else {
-            return
-        }
-
-        currentUser.squadID = id
+    func setActiveSquad(id: String?) {
+        guard var currentUser else { return }
+        currentUser.activeSquadID = id
         currentUser.updatedAt = Date()
         self.currentUser = currentUser
     }
@@ -150,7 +147,7 @@ private extension StubSessionStore {
             id: userID,
             name: existingUser?.name ?? "",
             avatarURL: existingUser?.avatarURL,
-            squadID: existingUser?.squadID,
+            activeSquadID: existingUser?.activeSquadID,
             createdAt: existingUser?.createdAt ?? now,
             updatedAt: now
         )

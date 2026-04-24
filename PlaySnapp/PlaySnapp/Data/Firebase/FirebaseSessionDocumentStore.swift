@@ -143,11 +143,14 @@ private extension FirebaseSessionDocumentStore {
         let updatedAt = Date.now
         #endif
 
+        // Read activeSquadID; fall back to legacy "squadID" field for existing documents
+        let activeSquadID = data["activeSquadID"] as? String ?? data["squadID"] as? String
+
         return AppUser(
             id: userID,
             name: resolvedName ?? "Player",
             avatarURL: avatarString.flatMap(URL.init(string:)),
-            squadID: data["squadID"] as? String,
+            activeSquadID: activeSquadID,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
