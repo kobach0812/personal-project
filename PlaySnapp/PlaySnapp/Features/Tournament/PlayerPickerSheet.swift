@@ -28,7 +28,7 @@ struct PlayerPickerSheet: View {
         for user in squadUsers where selectedUserIDs.contains(user.id) {
             result.append(TournamentPlayer(
                 id: UUID().uuidString, name: user.name, userID: user.id,
-                played: 0, wins: 0, losses: 0, lastPlayedAt: 0
+                played: 0, wins: 0, losses: 0, lastPlayedAt: 0, isActive: true
             ))
         }
         // Friends not already added via squad
@@ -36,14 +36,14 @@ struct PlayerPickerSheet: View {
         for friend in friends where selectedUserIDs.contains(friend.id) && !addedUserIDs.contains(friend.id) {
             result.append(TournamentPlayer(
                 id: UUID().uuidString, name: friend.name, userID: friend.id,
-                played: 0, wins: 0, losses: 0, lastPlayedAt: 0
+                played: 0, wins: 0, losses: 0, lastPlayedAt: 0, isActive: true
             ))
         }
         // Guests (no linked user)
         for name in guests {
             result.append(TournamentPlayer(
                 id: UUID().uuidString, name: name, userID: nil,
-                played: 0, wins: 0, losses: 0, lastPlayedAt: 0
+                played: 0, wins: 0, losses: 0, lastPlayedAt: 0, isActive: true
             ))
         }
         return result

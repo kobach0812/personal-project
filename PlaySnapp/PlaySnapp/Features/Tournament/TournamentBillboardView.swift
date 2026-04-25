@@ -1,16 +1,22 @@
 import SwiftUI
 
 struct TournamentBillboardView: View {
-    @ObservedObject var vm: TournamentViewModel
+    let players: [TournamentPlayer]
+
+    private var sorted: [TournamentPlayer] {
+        players.sorted {
+            if $0.wins != $1.wins     { return $0.wins > $1.wins }
+            if $0.losses != $1.losses { return $0.losses < $1.losses }
+            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 headerRow
-
                 Divider()
-
-                if vm.billboardPlayers.isEmpty {
+                if sorted.isEmpty {
                     ContentUnavailableView(
                         "No results yet",
                         systemImage: "list.number",
@@ -18,7 +24,7 @@ struct TournamentBillboardView: View {
                     )
                     .padding(.top, 40)
                 } else {
-                    ForEach(Array(vm.billboardPlayers.enumerated()), id: \.element.id) { rank, player in
+                    ForEach(Array(sorted.enumerated()), id: \.element.id) { rank, player in
                         playerRow(rank: rank + 1, player: player)
                         Divider().padding(.leading, 16)
                     }
@@ -30,8 +36,7 @@ struct TournamentBillboardView: View {
 
     private var headerRow: some View {
         HStack {
-            Text("Player")
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Player").frame(maxWidth: .infinity, alignment: .leading)
             Text("Played").frame(width: 52, alignment: .center)
             Text("W").frame(width: 32, alignment: .center)
             Text("L").frame(width: 32, alignment: .center)
@@ -51,9 +56,7 @@ struct TournamentBillboardView: View {
             Text("\(player.played)").frame(width: 52, alignment: .center)
             Text("\(player.wins)").frame(width: 32, alignment: .center)
             Text("\(player.losses)").frame(width: 32, alignment: .center)
-            Text("\(player.wins)")
-                .frame(width: 40, alignment: .center)
-                .fontWeight(.semibold)
+            Text("\(player.wins)").frame(width: 40, alignment: .center).fontWeight(.semibold)
         }
         .font(.callout)
         .padding(.horizontal)

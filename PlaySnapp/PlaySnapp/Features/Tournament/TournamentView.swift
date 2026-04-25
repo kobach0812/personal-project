@@ -6,16 +6,16 @@ import SwiftUI
 struct TournamentView: View {
     var body: some View {
         NavigationStack {
-            GameSessionListView()
+            TournamentListView()
         }
     }
 }
 
-// MARK: - Session list
+// MARK: - Tournament list ViewModel
 
 @MainActor
-final class GameSessionListViewModel: ObservableObject {
-    @Published var sessions: [TournamentSession] = []
+final class TournamentListViewModel: ObservableObject {
+    @Published var tournaments: [Tournament] = []
     @Published var currentUser: AppUser?
     @Published var squad: Squad?
     @Published var isLoading = false
@@ -28,39 +28,45 @@ final class GameSessionListViewModel: ObservableObject {
     ) async {
         isLoading = true
         defer { isLoading = false }
-        async let user = try? userProfileService.fetchCurrentUser()
+        async let user         = try? userProfileService.fetchCurrentUser()
         async let fetchedSquad = try? squadService.fetchCurrentSquad()
         currentUser = await user
-        squad = await fetchedSquad
+        squad       = await fetchedSquad
         guard let squadID = squad?.id else { return }
         do {
-            sessions = try await tournamentService.fetchSessions(squadID: squadID)
+            tournaments = try await tournamentService.fetchTournaments(squadID: squadID)
         } catch {
-            errorMessage = "Could not load sessions."
+            errorMessage = "Could not load tournaments."
         }
     }
 }
 
-struct GameSessionListView: View {
+// MARK: - Tournament list view
+
+struct TournamentListView: View {
     @EnvironmentObject private var env: AppEnvironment
-    @StateObject private var vm = GameSessionListViewModel()
+    @StateObject private var vm = TournamentListViewModel()
     @State private var showSetup = false
-    @State private var navigateTo: TournamentSession?
+    @State private var navigateTo: Tournament?
 
     var body: some View {
-        sessionContent
-            .navigationTitle("Game")
+        listContent
+            .navigationTitle("Tournaments")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showSetup = true } label: { Image(systemName: "plus") }
                 }
             }
-            .navigationDestination(item: $navigateTo) { (session: TournamentSession) in
-                TournamentSessionView(session: session, currentUser: vm.currentUser)
+            .navigationDestination(item: $navigateTo) { (tournament: Tournament) in
+                TournamentDetailView(
+                    tournament: tournament,
+                    currentUser: vm.currentUser,
+                    squadMemberIDs: vm.squad?.memberIDs ?? []
+                )
             }
             .sheet(isPresented: $showSetup) { setupSheet }
-            .task { await loadSessions() }
+            .task { await loadTournaments() }
             .alert("Error", isPresented: Binding(
                 get: { vm.errorMessage != nil },
                 set: { if !$0 { vm.errorMessage = nil } }
@@ -72,20 +78,22 @@ struct GameSessionListView: View {
     }
 
     @ViewBuilder
-    private var sessionContent: some View {
+    private var listContent: some View {
         if vm.isLoading {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if vm.sessions.isEmpty {
+        } else if vm.tournaments.isEmpty {
             ContentUnavailableView(
-                "No sessions yet",
+                "No tournaments yet",
                 systemImage: "sportscourt",
-                description: Text("Tap + to start a new session.")
+                description: Text("Tap + to create your first tournament.")
             )
         } else {
             List {
-                ForEach(vm.sessions) { session in
-                    Button { navigateTo = session } label: { SessionRow(session: session) }
-                        .foregroundStyle(.primary)
+                ForEach(vm.tournaments) { tournament in
+                    Button { navigateTo = tournament } label: {
+                        TournamentRow(tournament: tournament)
+                    }
+                    .foregroundStyle(.primary)
                 }
             }
         }
@@ -96,12 +104,12 @@ struct GameSessionListView: View {
             squadID: vm.squad?.id ?? "",
             createdBy: vm.currentUser?.id ?? "",
             squadMemberIDs: vm.squad?.memberIDs ?? []
-        ) { (newSession: TournamentSession) in
-            vm.sessions.insert(newSession, at: 0)
+        ) { (newTournament: Tournament) in
+            vm.tournaments.insert(newTournament, at: 0)
         }
     }
 
-    private func loadSessions() async {
+    private func loadTournaments() async {
         await vm.load(
             userProfileService: env.userProfileService,
             squadService: env.squadService,
@@ -110,74 +118,43 @@ struct GameSessionListView: View {
     }
 }
 
-private struct SessionRow: View {
-    let session: TournamentSession
+// MARK: - Tournament row
+
+private struct TournamentRow: View {
+    let tournament: Tournament
 
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(session.status == .active ? Color.green : Color.secondary)
+                .fill(tournament.status == .active ? Color.green : Color.secondary)
                 .frame(width: 8, height: 8)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.title.isEmpty ? "Session" : session.title)
+                Text(tournament.title.isEmpty ? "Tournament" : tournament.title)
                     .font(.body)
-                Text("\(session.players.count) players · \(session.courts) court(s)")
+                Text("\(tournament.players.count) players")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Text(session.status == .active ? "Active" : "Finished")
-                .font(.caption.bold())
-                .foregroundStyle(session.status == .active ? .green : .secondary)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(tournament.status == .active ? "Active" : "Finished")
+                    .font(.caption.bold())
+                    .foregroundStyle(tournament.status == .active ? .green : .secondary)
+                if tournament.activeDayID != nil {
+                    Text("Day in progress")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
         }
         .padding(.vertical, 2)
     }
 }
 
-// MARK: - Session container (wraps TournamentViewModel for one session)
-
-struct TournamentSessionView: View {
-    let session: TournamentSession
-    let currentUser: AppUser?
-    @EnvironmentObject private var env: AppEnvironment
-    @StateObject private var vm = TournamentViewModel()
-    @Environment(\.dismiss) private var dismiss
-
-    private var navTitle: String {
-        session.title.isEmpty ? "Session" : session.title
-    }
-
-    var body: some View {
-        TournamentActiveView(vm: vm)
-            .navigationTitle(navTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .task {
-                await vm.loadSession(
-                    session,
-                    currentUser: currentUser,
-                    tournamentService: env.tournamentService
-                )
-            }
-            .onChange(of: vm.session?.status) { old, new in
-                // Only auto-dismiss on the active → finished transition (user just ended it).
-                // Opening an already-finished session goes nil → .finished, which we want to allow.
-                if old == .active && new == .finished { dismiss() }
-            }
-            .alert("Error", isPresented: Binding(
-                get: { vm.errorMessage != nil },
-                set: { if !$0 { vm.errorMessage = nil } }
-            )) {
-                Button("OK") { vm.errorMessage = nil }
-            } message: {
-                Text(vm.errorMessage ?? "")
-            }
-    }
-}
-
-// MARK: - Setup sheet
+// MARK: - Tournament creation sheet
 
 struct TournamentSetupSheet: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -186,127 +163,94 @@ struct TournamentSetupSheet: View {
     let squadID: String
     let createdBy: String
     let squadMemberIDs: [String]
-    var onSessionCreated: (TournamentSession) -> Void
+    var onCreated: (Tournament) -> Void
 
     @State private var title = ""
-    @State private var courts = 2
     @State private var players: [TournamentPlayer] = []
     @State private var showPicker = false
     @State private var isCreating = false
     @State private var errorMessage: String?
 
-    private var canStart: Bool { players.count >= 4 }
-
-    private var footerText: String {
-        let count = players.count
-        let needed = courts * 4
-        if count < 4 { return "Add at least 4 players to start." }
-        if count < needed { return "\(courts) courts need \(needed) players — \(needed - count) more needed, or reduce courts." }
-        let activeCourts = min(courts, count / 4)
-        let playing = activeCourts * 4
-        let sittingCount = count - playing
-        return sittingCount > 0
-            ? "\(sittingCount) player(s) will sit out each round."
-            : "All \(count) players will play every round."
-    }
+    private var canCreate: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Session") {
-                    TextField("Name (optional, e.g. Tuesday 8pm)", text: $title)
-                }
-
-                Section("Courts") {
-                    Stepper("\(courts) court(s)", value: $courts, in: 1...8)
+                Section("Name") {
+                    TextField("e.g. Tuesday Badminton League", text: $title)
                 }
 
                 Section {
-                    ForEach(players) { player in
-                        Text(player.name)
-                    }
-                    .onDelete { players.remove(atOffsets: $0) }
-
-                    Button {
-                        showPicker = true
-                    } label: {
+                    ForEach(players) { player in Text(player.name) }
+                        .onDelete { players.remove(atOffsets: $0) }
+                    Button { showPicker = true } label: {
                         Label("Add Players", systemImage: "person.badge.plus")
                     }
                 } header: {
-                    Text("Players (\(players.count))")
+                    Text("Initial Roster (\(players.count))")
                 } footer: {
-                    Text(footerText)
-                        .foregroundStyle(canStart ? Color.secondary : Color.orange)
+                    Text("You can adjust who plays on each day.")
+                        .foregroundStyle(.secondary)
                 }
 
                 if let error = errorMessage {
-                    Section {
-                        Text(error).foregroundStyle(.red).font(.footnote)
-                    }
+                    Section { Text(error).foregroundStyle(.red).font(.footnote) }
                 }
 
                 Section {
-                    Button("Start Session") {
-                        Task { await start() }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .disabled(!canStart || isCreating)
+                    Button("Create Tournament") { Task { await create() } }
+                        .frame(maxWidth: .infinity)
+                        .disabled(!canCreate || isCreating)
                 }
             }
             .disabled(isCreating)
-            .navigationTitle("New Session")
+            .navigationTitle("New Tournament")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
             .sheet(isPresented: $showPicker) {
-                PlayerPickerSheet(squadMemberIDs: squadMemberIDs) { newPlayers in
-                    // Merge: skip players already in the roster by userID or name
-                    let existingUserIDs = Set(players.compactMap(\.userID))
+                PlayerPickerSheet(squadMemberIDs: squadMemberIDs) { (newPlayers: [TournamentPlayer]) in
+                    let existingIDs   = Set(players.compactMap(\.userID))
                     let existingNames = Set(players.filter { $0.userID == nil }.map(\.name))
                     for p in newPlayers {
-                        if let uid = p.userID {
-                            if !existingUserIDs.contains(uid) { players.append(p) }
-                        } else {
-                            if !existingNames.contains(p.name) { players.append(p) }
-                        }
+                        if let uid = p.userID { if !existingIDs.contains(uid)     { players.append(p) } }
+                        else                  { if !existingNames.contains(p.name) { players.append(p) } }
                     }
                 }
             }
         }
     }
 
-    private func start() async {
+    private func create() async {
         isCreating = true
         errorMessage = nil
         defer { isCreating = false }
         do {
-            let session = try await env.tournamentService.createSession(
+            let tournament = try await env.tournamentService.createTournament(
                 squadID: squadID,
                 createdBy: createdBy,
                 title: title.trimmingCharacters(in: .whitespaces),
-                courts: courts,
                 players: players
             )
             dismiss()
-            onSessionCreated(session)
+            onCreated(tournament)
         } catch {
-            errorMessage = "Could not start session."
+            errorMessage = "Could not create tournament."
         }
     }
 }
 
-// MARK: - Active session (Round / Board / History tabs)
+// MARK: - Active day view container (Summary / Round / Board / History)
 
 struct TournamentActiveView: View {
     @ObservedObject var vm: TournamentViewModel
     @State private var selectedTab = 0
 
+    private var isFinished: Bool { vm.session?.status == .finished }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Participant banner: shown when the current user is up on a court
             if let banner = vm.participantBannerText {
                 Text(banner)
                     .font(.subheadline.bold())
@@ -320,7 +264,7 @@ struct TournamentActiveView: View {
             }
 
             Picker("", selection: $selectedTab) {
-                Text("Round").tag(0)
+                Text(isFinished ? "Summary" : "Round").tag(0)
                 Text("Board").tag(1)
                 Text("History").tag(2)
             }
@@ -331,9 +275,22 @@ struct TournamentActiveView: View {
             Divider()
 
             switch selectedTab {
-            case 0:  TournamentRoundView(vm: vm)
-            case 1:  TournamentBillboardView(vm: vm)
-            default: TournamentHistoryView(vm: vm)
+            case 0:
+                if isFinished, let session = vm.session {
+                    TournamentSummaryView(session: session)
+                } else {
+                    TournamentRoundView(vm: vm)
+                }
+            case 1:  TournamentBillboardView(players: vm.billboardPlayers)
+            default: TournamentHistoryView(
+                        matches: vm.session?.completedMatches ?? [],
+                        playerName: vm.playerName
+                     )
+            }
+        }
+        .onChange(of: vm.session?.status) { old, new in
+            if old == .active && new == .finished {
+                selectedTab = 0 // switch to Summary when day ends
             }
         }
     }

@@ -1,21 +1,22 @@
 import SwiftUI
 
 struct TournamentHistoryView: View {
-    @ObservedObject var vm: TournamentViewModel
+    let matches: [TournamentMatch]
+    let playerName: (String) -> String
 
     var body: some View {
         Group {
-            if let session = vm.session, !session.completedMatches.isEmpty {
-                List(session.completedMatches) { match in
-                    HistoryRow(match: match, vm: vm)
-                }
-                .listStyle(.plain)
-            } else {
+            if matches.isEmpty {
                 ContentUnavailableView(
                     "No matches yet",
                     systemImage: "clock.arrow.circlepath",
                     description: Text("Completed matches will appear here.")
                 )
+            } else {
+                List(matches) { match in
+                    HistoryRow(match: match, playerName: playerName)
+                }
+                .listStyle(.plain)
             }
         }
     }
@@ -23,7 +24,7 @@ struct TournamentHistoryView: View {
 
 private struct HistoryRow: View {
     let match: TournamentMatch
-    @ObservedObject var vm: TournamentViewModel
+    let playerName: (String) -> String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -40,11 +41,11 @@ private struct HistoryRow: View {
             }
 
             HStack(spacing: 6) {
-                teamLabel(ids: match.teamA, isWinner: match.winnerTeam == .teamA)
+                teamLabel(ids: match.teamA, isWinner: match.winnerTeam == .teamA, alignment: .leading)
                 scoreLabel(score: match.teamAScore)
                 Text("–").foregroundStyle(.secondary)
                 scoreLabel(score: match.teamBScore)
-                teamLabel(ids: match.teamB, isWinner: match.winnerTeam == .teamB)
+                teamLabel(ids: match.teamB, isWinner: match.winnerTeam == .teamB, alignment: .trailing)
             }
             .font(.callout)
         }
@@ -52,21 +53,18 @@ private struct HistoryRow: View {
     }
 
     @ViewBuilder
-    private func teamLabel(ids: [String], isWinner: Bool) -> some View {
-        Text(ids.map { vm.playerName($0) }.joined(separator: " & "))
+    private func teamLabel(ids: [String], isWinner: Bool, alignment: Alignment) -> some View {
+        Text(ids.map { playerName($0) }.joined(separator: " & "))
             .fontWeight(isWinner ? .semibold : .regular)
-            .frame(maxWidth: .infinity, alignment: ids == match.teamA ? .leading : .trailing)
+            .frame(maxWidth: .infinity, alignment: alignment)
     }
 
     @ViewBuilder
     private func scoreLabel(score: Int?) -> some View {
         if let score {
-            Text("\(score)")
-                .fontWeight(.semibold)
-                .monospacedDigit()
+            Text("\(score)").fontWeight(.semibold).monospacedDigit()
         } else {
-            Text("–")
-                .foregroundStyle(.secondary)
+            Text("–").foregroundStyle(.secondary)
         }
     }
 }

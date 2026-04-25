@@ -12,7 +12,7 @@ enum TournamentRotationEngine {
         session: TournamentSession
     ) -> TournamentMatch? {
         let busyIDs = Set(session.currentRound.flatMap { $0.teamA + $0.teamB })
-        let eligible = session.players.filter { !busyIDs.contains($0.id) }
+        let eligible = session.players.filter { !busyIDs.contains($0.id) && $0.isActive }
         let sorted = sortedByPriority(eligible)
         guard sorted.count >= 4 else { return nil }
         let four = Array(sorted.prefix(4))

@@ -80,4 +80,6 @@ struct TournamentSession: Identifiable, Codable, Hashable, Sendable {
     var partnerships: [String: [String: Int]]
     /// User IDs of all roster-added participants. Used for participant live-view.
     var participantUserIDs: [String]
+    /// Set when the day is ended. Used to compute duration in the Summary tab.
+    var endedAt: Date?
 }
