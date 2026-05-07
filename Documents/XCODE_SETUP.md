@@ -101,28 +101,31 @@ The repo already includes:
 - `LocalOnboardingFlagStore` for offline-resilient onboarding flags
 - Camera permission placeholder and shared utilities
 
-## 9. Immediate next actions
+## 9. Current setup status (as of 2026-05-02)
 
-Steps 1–6 below are the ordered path to Milestone 1 completion:
+All Milestone 1–5, 7, 9–13 setup steps are complete. The app runs end-to-end on Firebase.
 
-1. ✅ Firebase packages added
-2. ✅ `GoogleService-Info.plist` added to app target
-3. ✅ `PlaySnapApp.swift` running in `.firebasePrepared`
-4. **You** → In Firebase Console, enable Email/Password auth provider if not done
-5. **You** → In Firebase Console, create the Firestore database, set rules to allow authenticated reads/writes
-6. **You** → Configure App Groups capability in Xcode (`group.com.playsnap.shared`) for both app and widget targets
-7. Test email sign-in end to end: sign up → profile setup → squad setup → main tab
-8. Verify `users/{uid}` document is created in Firestore after sign-in
-9. Implement [FirebaseSquadService.swift](/Users/andythang/personal-project/PlaySnapp/PlaySnapp/Data/Firebase/) — create/join squad in Firestore (Milestone 2)
+| Step | Status |
+|------|--------|
+| Firebase packages added | ✅ Done |
+| `GoogleService-Info.plist` in app target | ✅ Done |
+| App running `.firebasePrepared` | ✅ Done |
+| Email/Password auth enabled in Firebase Console | ✅ Done |
+| Firestore database created with security rules | ✅ Done |
+| App Groups configured (`group.com.playsnapp.shared`) | ✅ Done |
+| `FirebaseSquadService` implemented | ✅ Done (M2) |
+| `FirebasePlayService` implemented | ✅ Done (M4) |
+| `FirebaseStorageService.uploadPhoto` implemented | ✅ Done (M3) |
+| `FirebaseFriendService` implemented | ✅ Done (M11) |
+| `FirebaseTournamentService` implemented | ✅ Done (M10/M13) |
 
 ## 10. Remaining setup gaps
 
 | Gap | Blocker |
 |-----|---------|
-| App Groups capability not configured in Xcode | Widget data sharing won't work until this is done |
-| Push Notifications capability missing | Requires paid Apple Developer account |
-| Phone auth not testable | Requires real device + APNS token |
-| Apple Sign In parked | Requires paid Apple Developer account + Push Notifications capability |
-| `FirebaseSquadService` not implemented | Squad data is stub-only (in-memory, not persisted to Firestore) |
-| `FirebasePlayService` not implemented | Feed data is stub-only |
-| `FirebaseStorageService.uploadPhoto/Video/Avatar` not implemented | Upload pipeline is Milestone 3 |
+| Push Notifications capability | Requires paid Apple Developer account ($99/year) |
+| Sign in with Apple | Requires paid Apple Developer account + Push Notifications |
+| Phone auth on real device | Requires APNS token (needs paid account) |
+| TestFlight submission | Requires paid Apple Developer account |
+| `FirebaseStorageService.uploadVideo` | Not yet implemented (M8 deferred) |
+| `FirebaseStorageService.uploadAvatar` | Not yet implemented; UI not wired |

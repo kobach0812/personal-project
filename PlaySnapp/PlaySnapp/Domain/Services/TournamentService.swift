@@ -34,8 +34,17 @@ protocol TournamentServicing: Sendable {
 
     // MARK: - In-session operations
 
+    /// Real-time observer for the session document. Yields on every remote change.
+    /// completedMatches in yielded sessions is always empty — load separately via fetchMatches.
+    func observeSession(squadID: String, tournamentID: String, sessionID: String) -> AsyncStream<TournamentSession>
+
     func generateNextRound(for session: TournamentSession) async throws -> TournamentSession
     func recordResult(for session: TournamentSession, matchID: String, winner: WinnerTeam, scoreA: Int?, scoreB: Int?) async throws -> TournamentSession
     /// Persists a changed players array (used for bench / restore / remove).
     func updatePlayers(_ players: [TournamentPlayer], for session: TournamentSession) async throws -> TournamentSession
+
+    // MARK: - Participant self-actions
+
+    /// Participant toggles their own isActive flag. VM enforces caller only touches their own row.
+    func setSelfBench(playerID: String, isActive: Bool, for session: TournamentSession) async throws -> TournamentSession
 }

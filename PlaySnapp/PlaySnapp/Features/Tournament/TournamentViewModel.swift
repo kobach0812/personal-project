@@ -9,6 +9,8 @@ final class TournamentViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
+    private var observerTask: Task<Void, Never>?
+
     var isOrganizer: Bool {
         guard let tournament, let user = currentUser else { return false }
         return tournament.createdBy == user.id
@@ -62,6 +64,27 @@ final class TournamentViewModel: ObservableObject {
         self.currentUser = currentUser
         if let matches = try? await tournamentService.fetchMatches(for: session) {
             self.session?.completedMatches = matches
+        }
+        startObserving(session: session, tournamentService: tournamentService)
+    }
+
+    private func startObserving(session: TournamentSession, tournamentService: TournamentServicing) {
+        observerTask?.cancel()
+        observerTask = Task {
+            let stream = tournamentService.observeSession(
+                squadID: session.squadID,
+                tournamentID: session.tournamentID,
+                sessionID: session.id
+            )
+            for await fresh in stream {
+                guard !Task.isCancelled else { break }
+                // Preserve locally loaded completedMatches (they come from a subcollection, not the session doc)
+                let existing = self.session?.completedMatches ?? []
+                self.session = fresh
+                if self.session?.completedMatches.isEmpty == true {
+                    self.session?.completedMatches = existing
+                }
+            }
         }
     }
 
@@ -126,4 +149,34 @@ final class TournamentViewModel: ObservableObject {
             errorMessage = "Could not update players."
         }
     }
+
+    // MARK: - Participant self-actions
+
+    /// Participant benches or restores themselves. Only valid when the player is not currently on court.
+    func selfBenchToggle(tournamentService: TournamentServicing) async {
+        guard let session, let user = currentUser,
+              let myPlayer = session.players.first(where: { $0.userID == user.id }) else { return }
+        let onCourt = session.currentRound.flatMap { $0.teamA + $0.teamB }.contains(myPlayer.id)
+        guard !onCourt else { return }
+        do {
+            self.session = try await tournamentService.setSelfBench(
+                playerID: myPlayer.id,
+                isActive: !myPlayer.isActive,
+                for: session
+            )
+        } catch {
+            errorMessage = "Could not update your status."
+        }
+    }
+
+    var myPlayer: TournamentPlayer? {
+        guard let session, let user = currentUser else { return nil }
+        return session.players.first { $0.userID == user.id }
+    }
+
+    var myPlayerIsOnCourt: Bool {
+        guard let session, let player = myPlayer else { return false }
+        return session.currentRound.flatMap { $0.teamA + $0.teamB }.contains(player.id)
+    }
+
 }

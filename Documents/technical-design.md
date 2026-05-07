@@ -64,7 +64,7 @@ Your proposed direction is good, but these changes matter:
 
 ## 4. Project structure
 
-Current actual structure (as of Milestone 1):
+Current actual structure (as of Milestone 13):
 
 ```text
 PlaySnap/
@@ -80,7 +80,9 @@ PlaySnap/
 │   │   ├── Play.swift
 │   │   ├── PlayReaction.swift
 │   │   ├── DeviceRegistration.swift
-│   │   └── AppNotification.swift
+│   │   ├── AppNotification.swift
+│   │   ├── FriendModels.swift            ← M11: Friend, FriendRequest
+│   │   └── TournamentModels.swift        ← M10/M13: session, match, player models
 │   └── Services/
 │       ├── AuthService.swift
 │       ├── OnboardingProgressService.swift
@@ -89,35 +91,40 @@ PlaySnap/
 │       ├── SquadService.swift
 │       ├── StorageService.swift
 │       ├── NotificationService.swift
-│       └── WidgetSyncService.swift
+│       ├── WidgetSyncService.swift
+│       ├── FriendService.swift           ← M11
+│       └── TournamentService.swift       ← M10/M13
 ├── Data/
 │   ├── Firebase/
 │   │   ├── FirebaseConfiguration.swift
-│   │   ├── FirestorePaths.swift          ← Firestore collection/document paths
+│   │   ├── FirestorePaths.swift
 │   │   ├── StoragePaths.swift            ← Firebase Storage upload/download paths
 │   │   ├── FirebaseIntegrationError.swift
-│   │   ├── FirebaseAuthGateway.swift     ← thin wrapper over Firebase Auth SDK
+│   │   ├── FirebaseAuthGateway.swift
 │   │   ├── FirebaseSessionDocumentStore.swift
 │   │   ├── FirebaseAuthService.swift
 │   │   ├── FirebaseOnboardingProgressService.swift
 │   │   ├── FirebaseUserProfileService.swift
-│   │   ├── FirebaseStorageService.swift  ← upload stubs, wired in Milestone 3
+│   │   ├── FirebaseStorageService.swift  ← photo upload (video/avatar deferred)
 │   │   ├── AppleSignInProvider.swift     ← parked until paid dev account
-│   │   ├── FirebaseSquadService.swift    ← TODO: Milestone 2
-│   │   ├── FirebasePlayService.swift     ← TODO: Milestone 4
-│   │   └── FirebaseNotificationService.swift ← TODO: Milestone 6
+│   │   ├── FirebaseSquadService.swift    ← M2 ✅
+│   │   ├── FirebasePlayService.swift     ← M4 ✅
+│   │   ├── FirebaseFriendService.swift   ← M11 ✅
+│   │   └── FirebaseTournamentService.swift ← M10/M13 ✅
 │   ├── Local/
 │   │   ├── LocalWidgetSyncService.swift
-│   │   └── LocalOnboardingFlagStore.swift  ← offline-resilient onboarding flags
+│   │   └── LocalOnboardingFlagStore.swift
 │   └── Stubs/
-│       ├── StubSessionStore.swift        ← shared in-memory state for dev mode
+│       ├── StubSessionStore.swift
 │       ├── StubAuthService.swift
 │       ├── StubOnboardingProgressService.swift
 │       ├── StubUserProfileService.swift
 │       ├── StubSquadService.swift
 │       ├── StubPlayService.swift
 │       ├── StubStorageService.swift
-│       └── StubNotificationService.swift
+│       ├── StubNotificationService.swift
+│       ├── StubFriendService.swift       ← M11
+│       └── StubTournamentService.swift   ← M10/M13
 ├── Features/
 │   ├── Auth/
 │   │   ├── AuthView.swift
@@ -132,18 +139,28 @@ PlaySnap/
 │   ├── Camera/
 │   │   ├── CameraView.swift
 │   │   ├── CameraViewModel.swift
+│   │   ├── CameraPreviewView.swift
 │   │   └── CapturePreviewView.swift
 │   ├── Feed/
 │   │   ├── FeedView.swift
 │   │   ├── FeedViewModel.swift
 │   │   ├── PlayCardView.swift
 │   │   └── PlayDetailView.swift
+│   ├── Friends/
+│   │   ├── FriendsView.swift             ← M11
+│   │   └── FriendsViewModel.swift
 │   ├── Notifications/
 │   │   ├── NotificationsView.swift
 │   │   └── NotificationsViewModel.swift
-│   └── Profile/
-│       ├── ProfileView.swift
-│       └── ProfileViewModel.swift
+│   ├── Profile/
+│   │   ├── ProfileView.swift
+│   │   └── ProfileViewModel.swift
+│   └── Tournament/
+│       ├── TournamentView.swift          ← M10/M13: Game tab root
+│       ├── TournamentViewModel.swift
+│       ├── TournamentDetailView.swift    ← M13: session list + day detail
+│       ├── TournamentSummaryView.swift   ← M13: finished day summary
+│       └── PlayerPickerSheet.swift       ← M13: squad/friends/guest roster picker
 ├── Infrastructure/
 │   └── Camera/
 │       └── CameraManager.swift
@@ -154,7 +171,8 @@ PlaySnap/
 │   ├── Utilities/
 │   │   ├── ImageCompressor.swift
 │   │   ├── VideoThumbnailGenerator.swift
-│   │   └── TemporaryFileCleaner.swift
+│   │   ├── TemporaryFileCleaner.swift
+│   │   └── WidgetThumbnailRenderer.swift
 │   └── Widget/
 │       └── AppGroupStore.swift
 └── WidgetExtension/
@@ -170,7 +188,7 @@ Notes:
 - `Data` may import Firebase, WidgetKit, or storage SDKs
 - `PreviewSupport` must not leak into production persistence code
 - `Utilities/` should stay small or it becomes a junk drawer
-- Files marked `← TODO` are the next Firebase implementations to write
+- Every Firebase service has a matching `Stub` for `.development` mode
 
 ## 5. Runtime architecture
 

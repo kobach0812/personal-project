@@ -240,12 +240,14 @@ squads/{squadID}/tournaments/{sessionID}
   - partnerships: { playerID: { partnerID: count } }      // for partner-rotation fairness
 ```
 
-Status (as of 2026-04-22):
-- Domain models, rotation engine, stub + Firebase services, setup/round/billboard views all shipped in-session.
+Status (as of 2026-05-02): ✅ COMPLETE
+- Domain models, rotation engine, stub + Firebase services, setup/round/billboard views all shipped.
 - `Game` tab wired into `MainTab` / `PlaySnapApp`. Trophy button removed from `FeedView`.
-- History/score-entry features are **not yet implemented** — see "Next up" below.
+- Score entry (teamAScore/teamBScore) implemented via sheet on `MatchCard`.
+- `completedMatches` tracked in-session and promoted to Firestore `matches` subcollection in M13.
+- History tab shows completed matches with scores and timestamps.
 
-### Next up: score entry + match history (in-session only, Firebase later)
+### Score entry + match history ✅ COMPLETE
 
 Goal:
 - Organizer enters the actual score (e.g., 21–18) when recording a result — not just "Team A won".
@@ -314,16 +316,34 @@ The practical order is:
 10. Polish
 11. Fair-play rotation tournament
 
-## 5. Current tickets (as of 2026-04-22)
+## 5. Current state (as of 2026-05-02)
 
-Milestones 0–7 done. Milestone 8 (video) deferred. Milestone 10 (Game) core shipped. Sport field removed — app is badminton-only. Tab order: Feed · Game · Camera · Alerts · Profile. Immediate next tickets:
+Milestones 0–5, 7, 9–13 complete. Milestone 6 (push notifications) parked pending paid Apple Developer account. Milestone 8 (video) deferred.
 
-1. **Milestone 9: Polish** — sign-out flow, profile edit, loading/error state improvements, TestFlight prep
-2. **Milestone 11: Friends** — social graph; unlocks roster-picker in M13
-3. **Milestone 12: Multi-squad membership** — decouple `users/{uid}.squadID` into a memberships collection + active-squad switcher
-4. **Milestone 13: Multi-session Game + roster picker** — promote match history to Firestore, many sessions per squad, participants get a live read-only view
+**Completed since last update:**
+- M9: Sign-out, profile edit, loading/error states, widget onboarding
+- M10: Fair-play rotation tournament, score entry, match history, leaderboard
+- M11: Friends social graph (search, request, accept/decline, friends list)
+- M12: Multi-squad membership, active squad switcher in Profile
+- M13: Multi-session Game tab, `TournamentDetailView` session list, `StartDaySheet` with roster picker, `PlayerPickerSheet` (Squad / Friends / Guest tabs), day summary view for finished sessions, `matches` subcollection in Firestore, participant live view
 
-Suggested ordering: 9 → 11 → 12 → 13. M13 depends on M11 (roster picker needs friends) and M12 is independent but natural to do before M13 so session-list queries are already per-squad.
+**Remaining open work:**
+- M6: Push notifications — blocked on paid Apple Developer account ($99/year)
+- M8: Video capture and upload — deferred; requires temp file pipeline + thumbnail generation
+- Avatar upload — backend protocol ready (`StorageServicing.uploadAvatar`); UI needs `PhotosPicker` wiring
+- TestFlight submission — blocked on paid Apple Developer account
+- Sign in with Apple — parked in `AppleSignInProvider.swift`; requires paid account + Push Notifications capability
+
+**Next milestone candidates (growth + retention focus):**
+- M14: Squad invite link (deep link + share sheet) — unlock organic squad growth
+- M15: Weekly recap card (auto-generated, shareable image) — leave-the-app shareability
+- M16: Play streaks — cheapest possible retention mechanic
+- M17: Participant self-actions (sitting out, requesting score correction) — Game tab depth
+- M18: Scheduled game days + RSVP + check-in — turn Game tab into the reason people open the app
+
+**Future candidates (deferred or blocked):**
+- Push notifications (blocked: paid Apple Developer account)
+- Video support (deferred: storage cost, encoding pipeline)
 
 ---
 
@@ -619,7 +639,7 @@ Rollback: if the new client reads a user with no `squadIDs` but a legacy `squadI
 
 ---
 
-### Milestone 13: Multi-session Game + roster-based player selection
+### Milestone 13: Multi-session Game + roster-based player selection ✅ COMPLETE
 
 Goal:
 - Lift the Game tab from "one active session" to **many sessions per squad**, entered by roster rather than typed names, and make every added player a **participant** (not just a label on a card) so they can watch the schedule and scores live on their own device.
@@ -772,6 +792,708 @@ Extend the existing score-entry sheet (already planned in Milestone 10) to:
 - Session templates ("usual Tuesday crew").
 - Push notifications when you're up next (needs M6 push infra).
 - Cross-squad sessions (guest squad vs home squad) — explicit no.
+
+---
+
+### Milestone 14: Squad invite link 📋 PLANNED
+
+Goal:
+- Replace "tell your friend the 6-char code over text" with a tappable link. Onboarding a new squad member should be one tap, not three steps.
+
+Motivation:
+- Current join flow requires the inviter to recite an `inviteCode` and the invitee to type it into the join screen. Every character of friction loses people. The squad already has the code; we just need to wrap it in a URL and a Share button.
+- Growth is currently blocked by join friction. This is the single highest-leverage non-paid feature.
+
+Scope decisions (locked):
+- **Custom URL scheme** (`playsnapp://join?code=ABC123`) for MVP. Works without a paid Apple Developer account, no AASA file, no domain hosting. Universal Links (`https://playsnap.app/join?code=...`) deferred until a real domain + paid account exists.
+- **No new server state.** The invite code already lives on `squads/{squadID}.inviteCode`. The link is a thin client wrapper around it.
+- **No expiring links** in this milestone. Codes are stable per squad. Rotating-code support is a follow-up.
+- **No referral tracking.** We don't record who invited whom. (Could be added later by appending `&from=userID` to the link.)
+
+#### 14.1 Domain layer changes
+
+None. `Squad.inviteCode` already exists; this milestone consumes it.
+
+#### 14.2 Data layer changes
+
+None. No Firestore reads or writes added.
+
+#### 14.3 App layer changes
+
+`Info.plist`:
+- Add `CFBundleURLTypes` entry registering the `playsnapp` scheme.
+
+`PlaySnapApp.swift`:
+- Add `.onOpenURL { url in router.handleInviteURL(url) }` to the root scene.
+
+`AppRouter.swift`:
+- Add `@Published var pendingInviteCode: String?`.
+- Add `func handleInviteURL(_ url: URL)`:
+  - Parse `playsnapp://join?code=XXX`. If valid, store `pendingInviteCode = code`.
+  - If user is unauthenticated → set phase to `.auth`; the code persists through auth/profile setup.
+  - If user is authenticated and has no squad → route to `.squadSetup` with code prefilled.
+  - If user is in a squad → route to a "Join another squad?" confirmation (multi-squad is M12-supported), then prefill the join field.
+
+#### 14.4 Feature layer changes
+
+`Features/Profile/ProfileView.swift` (Squads section):
+- Add a Share button next to each squad row. Tap → `ShareLink(item: SquadInvite(...))` with a pre-formatted message:
+  ```
+  Join my squad "Tuesday Pickleball" on PlaySnapp:
+  playsnapp://join?code=ABC123
+  ```
+- Define `SquadInvite: Transferable` (or use `String`) — produces both the link and a fallback text.
+
+`Features/Squad/SquadJoinView.swift` (or wherever the join code field lives):
+- Accept an optional `prefilledCode: String?` initializer parameter.
+- On appear, if `pendingInviteCode` exists in the router, populate the field and (optionally) auto-submit after a 1.5s delay so the user sees what's happening.
+- After successful join, clear `router.pendingInviteCode`.
+
+#### 14.5 Build order
+
+1. Register URL scheme in `Info.plist`. Verify `xcrun simctl openurl booted "playsnapp://join?code=TEST"` prints something in `handleInviteURL`.
+2. Add `pendingInviteCode` flow in `AppRouter`. Manually verify routing through auth → join.
+3. Add `ShareLink` to Profile squads section. Test that tapping the shared link from Messages opens the app.
+4. Wire prefill into the join screen.
+5. Manual two-device QA: A taps share, sends to B via Messages; B taps link → installs/opens app → joins squad.
+
+#### 14.6 Done when
+
+- A user can tap "Share invite" on any squad and send a link via Messages, Mail, or any share extension.
+- A recipient who already has the app installed taps the link → app opens directly to the join flow with the code prefilled.
+- A recipient who is unauthenticated still gets the code held until they finish auth + profile setup.
+- The original Squad code-typing flow still works for users who receive only the code.
+
+#### 14.7 Out of scope / follow-ups
+
+- Universal Links (`https://...`) — needs domain + paid account.
+- Expiring or revocable codes.
+- Referral tracking (who invited whom).
+- QR code rendering for in-person sharing.
+
+---
+
+### Milestone 15: Weekly recap card 📋 PLANNED
+
+Goal:
+- Auto-generate a beautiful, shareable image summarizing the squad's week. Users post it to Instagram / iMessage / their group chat. The image leaves the app and pulls non-users back to the squad link.
+
+Motivation:
+- Every retention feature compounds against current users only. A recap card is one of the few features that creates *outbound* visibility — every share is potential acquisition.
+- Aggregation is local (filter feed by date); no backend change needed.
+
+Scope decisions (locked):
+- **Pure client-side derivation** from the existing feed. No new Firestore collection, no Cloud Functions.
+- **One canonical layout** in the first version. No themes, no customization. Ship one beautiful card.
+- **Window: last 7 days**, ending today. Not "last calendar week". Simpler and always fresh.
+- **Includes**: squad name, date range, play count, reaction count, top reactor (display name), top play thumbnail.
+- **Render via `ImageRenderer`** (SwiftUI 4+, iOS 16+). Same view used both for in-app preview and the rendered image — single source of truth.
+- **Entry**: a "📊 Recap" button in `FeedView` toolbar. Tap → preview sheet with `ShareLink` to the rendered PNG.
+
+#### 15.1 Domain layer changes
+
+New file `Domain/Models/SquadRecap.swift`:
+```swift
+struct SquadRecap: Equatable {
+    let squadName: String
+    let weekStart: Date
+    let weekEnd: Date
+    let playCount: Int
+    let reactionCount: Int
+    let topReactorName: String?
+    let topPlay: Play?
+}
+```
+
+No new protocol. The recap is derived, not fetched.
+
+#### 15.2 Shared utility
+
+New file `Shared/Utilities/SquadRecapBuilder.swift`:
+- `static func build(plays: [Play], squad: Squad, now: Date = .now) -> SquadRecap`
+- Pure function. Easy to unit test.
+- Filters plays where `createdAt >= now - 7d`. Sums `reactionSummary` values for the count. Picks the play with the highest reaction sum as `topPlay`. Picks the user with the most reactions given (best-effort: requires a small per-user tally; if that's expensive, defer to "top play poster").
+
+#### 15.3 Feature layer
+
+New folder `Features/Recap/`:
+- `WeeklyRecapView.swift` — the visual card. Designed to look good both in-app and as a 1080×1920 image. Uses `Squad`, `SquadRecap`, and renders the top play thumbnail via `AsyncImage`.
+- `WeeklyRecapViewModel.swift` — `@MainActor` `ObservableObject`. Loads plays via `playService.fetchFeed()`, builds the `SquadRecap`, exposes `state: .loading / .ready / .empty / .error`.
+- `WeeklyRecapSheet.swift` — wraps the card in a sheet with a `ShareLink` that exports the rendered image.
+
+`Features/Feed/FeedView.swift`:
+- Add a single toolbar button: `Button { showRecap = true } label: { Image(systemName: "chart.bar.doc.horizontal") }`.
+- Sheet presentation only — no other Feed changes.
+
+#### 15.4 Image rendering
+
+```swift
+@MainActor
+func renderRecapImage(_ recap: SquadRecap, squad: Squad) -> UIImage? {
+    let renderer = ImageRenderer(content: WeeklyRecapView(recap: recap, squad: squad).frame(width: 1080, height: 1920))
+    renderer.scale = 3
+    return renderer.uiImage
+}
+```
+
+`ShareLink` accepts the `UIImage` (wrap in a `Transferable` adapter or use the built-in `Image` overload).
+
+#### 15.5 Edge cases
+
+- **No plays this week** → empty state in the sheet: "No plays yet — post one to start your recap." No share button shown.
+- **Top play has no thumbnail** → fall back to a sport-themed gradient placeholder (matches widget empty state).
+- **Top reactor tie** → pick first by name (deterministic).
+- **Image render returns nil** (rare) → show a "Couldn't generate recap" error with retry.
+
+#### 15.6 Build order
+
+1. `SquadRecap` model + `SquadRecapBuilder` pure function. Unit test with fixture plays.
+2. `WeeklyRecapView` — visual layout. Iterate in Xcode preview with fixture data.
+3. `WeeklyRecapSheet` + `WeeklyRecapViewModel` — wire to live data.
+4. Toolbar entry on `FeedView`.
+5. `ShareLink` integration. Manual test: share to Messages, verify image quality.
+
+#### 15.7 Done when
+
+- A user opens the Feed, taps Recap, sees a card summarizing their squad's last 7 days.
+- The Share button exports a high-resolution PNG to any share extension.
+- Empty state is handled (no plays this week).
+- The card is visually distinct enough to be recognizable as PlaySnapp content when shared.
+
+#### 15.8 Out of scope / follow-ups
+
+- Multiple themes / customization.
+- Monthly / season recaps.
+- Auto-prompt to share at end-of-week (push notification).
+- Per-user year-in-review.
+- Animated recap (Stories format).
+
+---
+
+### Milestone 16: Play streaks 📋 PLANNED
+
+Goal:
+- Show "🔥 5 day streak" on the Feed when the squad has posted on consecutive days. One counter, zero new infrastructure, surprisingly addictive.
+
+Motivation:
+- Streaks are the cheapest retention mechanic in mobile apps (Snapchat, Duolingo). They cost almost nothing to build and create a daily-return habit.
+- Pure local computation — like the recap, derives from already-fetched feed.
+
+Scope decisions (locked):
+- **Squad-level streak**, not per-user. The unit of social cohesion in PlaySnapp is the squad. A single member posting keeps the streak alive.
+- **Day boundary = local timezone midnight.** Simple and matches user mental model.
+- **Computed locally on every feed load.** No persistence required — the feed itself is the source of truth.
+- **Streak breaks at >24h gap between posts.** Visualized as: any calendar date with zero plays breaks the streak.
+- **No retroactive streak preservation.** If a streak breaks, it resets to 0. No "streak freeze" tokens, no leniency.
+- **No celebration animations** in v1. Just the number and the flame. Keep it cheap.
+
+#### 16.1 Domain layer changes
+
+New file `Domain/Models/SquadStreak.swift`:
+```swift
+struct SquadStreak: Equatable {
+    let currentStreak: Int    // 0 if today has no posts AND yesterday didn't either
+    let isLiveToday: Bool     // true if a post was made today (the streak is "warm")
+    let lastPostDate: Date?
+}
+```
+
+#### 16.2 Shared utility
+
+New file `Shared/Utilities/StreakCalculator.swift`:
+- `static func compute(plays: [Play], now: Date = .now, calendar: Calendar = .current) -> SquadStreak`
+- Pure function:
+  1. Group plays by `Calendar.startOfDay(for:)` of `createdAt`.
+  2. Walk backwards from today: if today has plays → `isLiveToday = true`; start counting consecutive days with plays.
+  3. If today has no plays but yesterday does → still on streak (will break if no post today by midnight).
+  4. Stop at the first gap.
+- Easy to unit test with fixture dates.
+
+#### 16.3 Feature layer
+
+`Features/Feed/FeedView.swift`:
+- Add a small badge to the feed header (above the play list, below the navigation title):
+  - If `streak.currentStreak >= 2` → show `🔥 {N} day streak`.
+  - If `streak.currentStreak < 2` → hide the badge entirely (don't shame users).
+  - If `isLiveToday == false && currentStreak >= 2` → show `🔥 {N} days · post today to keep it!` (one gentle nudge).
+- The badge is read-only display — no tap action in v1.
+
+`Features/Feed/FeedViewModel.swift`:
+- After `fetchFeed()` succeeds, compute `streak = StreakCalculator.compute(plays: ...)`.
+- Expose `@Published var streak: SquadStreak?`.
+
+#### 16.4 Widget (stretch — gate on time)
+
+If trivial: extend `WidgetPayload` with `streakDays: Int?` and render a small "🔥 5" badge in the widget corner. Gate this behind a separate sub-task; the in-app badge ships first.
+
+#### 16.5 Edge cases
+
+- **Empty feed** → `currentStreak = 0`, badge hidden.
+- **All plays today** → `currentStreak = 1`. Badge hidden until at least 2 days (avoid spamming "1 day streak" on first post).
+- **Plays in the future** (clock skew) → ignore future-dated plays in the calculation.
+- **Multi-squad** → the streak is for the *active* squad only. Switching squads recomputes.
+
+#### 16.6 Build order
+
+1. `SquadStreak` model + `StreakCalculator` pure function. Unit tests with these fixtures:
+   - Empty feed → 0
+   - Posts today only → 1, isLiveToday = true
+   - Posts today + yesterday → 2
+   - Posts today + 2 days ago (gap yesterday) → 1
+   - Posts every day for a week → 7
+2. Wire into `FeedViewModel`.
+3. Add badge to `FeedView`.
+4. Manual QA: post a play, kill app, reopen → badge shows. Skip a day in code → badge resets.
+5. (Optional) Widget integration.
+
+#### 16.7 Done when
+
+- After two consecutive days of posting, the Feed shows "🔥 2 day streak".
+- The number ticks up correctly each day a post is made.
+- A skipped day resets the counter to 0.
+- The badge disappears cleanly when streak < 2.
+- Switching to a squad that has no streak hides the badge.
+
+#### 16.8 Out of scope / follow-ups
+
+- Per-user streaks ("you personally posted 3 days in a row").
+- Streak freezes / pauses.
+- Push notifications when a streak is at risk (blocked on M6).
+- Badges or rewards for milestones (10 days, 30 days, etc.).
+- Streak sharing as a recap card.
+
+---
+
+---
+
+### Milestone 17: Participant self-actions 📋 PLANNED
+
+Goal:
+- Give participants (non-organizer roster members) two simple write-actions in a live Game session: **mark themselves benched/active** ("I'm sitting this one out" / "I'm back in") and **request a score correction** on a completed match. Today only the organizer can write — every adjustment goes through them, which is friction at every court.
+
+Motivation observed in testing:
+- Players step out for water, a phone call, or to leave early. Today they have to physically tell the organizer, who has to find them in the player list and toggle their bench state. Most organizers just don't do it, so the rotation ships them new matches they can't play.
+- Score-entry mistakes happen (wrong court tapped, transposed digits). Currently the only fix path is "yell across the gym at the organizer". A lightweight in-app correction request closes the loop.
+- M13 already established the participant live view and the `role` distinction. M17 is the natural next step — turn the read-only live view into a *minimally* writable one.
+
+Scope decisions (locked):
+- **Two actions only**: self-bench toggle, and score-correction request. No self-scoring of new matches, no organizer-impersonation, no roster edits. Keep the surface area small.
+- **Self-bench is direct.** A participant toggling their own `isActive` writes immediately — no organizer approval. The rotation respects it on the next match generation. Same data path the organizer already uses; security rule just allows the *self* row.
+- **Score correction is a request, not a write.** Participant submits "Court 2, match at 7:43pm — I think it was 21–18, not 18–21". Organizer sees a small inbox in the live session view; they Approve (apply the change) or Dismiss. No automatic correction. Preserves organizer authority.
+- **Guests cannot self-act.** Self-actions require `userID`. Guests stay name-only, organizer-managed.
+- **No history of dismissed requests.** Resolved requests are deleted. Avoids building a moderation surface.
+- **No notifications** in this milestone. Organizer sees the inbox count next time they open the session. M6 unblocks push later.
+
+Depends on: M13 (multi-session Game + roster + live view) shipped.
+
+#### 17.1 Data model changes
+
+`TournamentPlayer` — no shape change. The existing `isActive: Bool` flag is the bench state.
+
+New subcollection:
+```
+squads/{squadID}/tournaments/{tournamentID}/sessions/{sessionID}/correctionRequests/{requestID}
+  - matchID: String
+  - requestedBy: String           // userID of the participant
+  - requestedByName: String       // snapshot for organizer UI
+  - proposedScoreA: Int
+  - proposedScoreB: Int
+  - proposedWinner: WinnerTeam    // derived if scores differ; explicit if tie
+  - note: String?                 // optional one-line "tapped wrong court"
+  - createdAt: Timestamp
+  - status: "pending"             // only pending docs exist; resolved → deleted
+```
+
+Why a subcollection rather than a field on the match: corrections are rare, transient, and resolution removes them. A subcollection keeps the match doc small and avoids contention when multiple participants request at once.
+
+Why the doc disappears on resolve (vs. flipping to `approved`/`dismissed`): in MVP we don't need an audit log. Less code, fewer rules.
+
+#### 17.2 Domain layer changes
+
+`TournamentServicing` additions:
+
+```swift
+// MARK: - Participant self-actions
+
+/// Sets the calling user's own isActive flag for the session.
+/// Server enforces caller.uid == player.userID.
+func setSelfBench(isActive: Bool, in session: TournamentSession) async throws -> TournamentSession
+
+/// Submits a score-correction request for a completed match.
+/// Server enforces caller.uid is in session.participantUserIDs.
+func submitCorrectionRequest(_ request: CorrectionRequest, for session: TournamentSession) async throws
+
+/// Organizer-only: stream of pending correction requests for the session.
+func observeCorrectionRequests(for session: TournamentSession) -> AsyncStream<[CorrectionRequest]>
+
+/// Organizer-only: applies the requested score, updates the match doc, recomputes
+/// player win/loss/leaderboard if the winner changed, then deletes the request doc — all in one batch.
+func approveCorrectionRequest(_ request: CorrectionRequest, for session: TournamentSession) async throws -> TournamentSession
+
+/// Organizer-only: deletes the request doc without applying it.
+func dismissCorrectionRequest(_ request: CorrectionRequest) async throws
+```
+
+New file `Domain/Models/CorrectionRequest.swift`:
+```swift
+struct CorrectionRequest: Identifiable, Codable, Equatable, Hashable, Sendable {
+    let id: String
+    let matchID: String
+    let requestedBy: String
+    let requestedByName: String
+    var proposedScoreA: Int
+    var proposedScoreB: Int
+    var proposedWinner: WinnerTeam
+    var note: String?
+    let createdAt: Date
+}
+```
+
+#### 17.3 Data layer changes
+
+`StubTournamentService`:
+- In-memory dictionary keyed by sessionID → list of `CorrectionRequest`.
+- `setSelfBench` flips the player's `isActive` and returns the updated session.
+- `approveCorrectionRequest` mirrors `recordResult` logic for the override case (winner flip → swap wins/losses on the four players).
+
+`FirebaseTournamentService`:
+- `setSelfBench`: single-field update on `players[index].isActive` via array rewrite (existing pattern in `updatePlayers`).
+- `submitCorrectionRequest`: `addDocument` to the new subcollection.
+- `observeCorrectionRequests`: snapshot listener wrapped in `AsyncStream`.
+- `approveCorrectionRequest`: batch write — update the match doc in `matches/{matchID}`, update affected players' wins/losses/lastPlayedAt if the winner flipped, update the leaderboard deltas, delete the request doc.
+- `dismissCorrectionRequest`: single delete.
+
+`FirestorePaths` additions: `correctionRequests(_:_:_:)`, `correctionRequest(_:_:_:_:)`.
+
+#### 17.4 Feature layer changes
+
+`Features/Tournament/TournamentViewModel.swift`:
+- Add `pendingCorrectionRequests: [CorrectionRequest]` (organizer view).
+- Add `selfBenchToggle()` — calls `setSelfBench` for the current user.
+- Add `submitCorrection(matchID:scoreA:scoreB:note:)`.
+- Add `approve(_:)` and `dismiss(_:)` for the organizer.
+
+`Features/Tournament/TournamentActiveView.swift` (or wherever the role-aware live view lives):
+- **Participant Round tab**: above the "You're up next on Court N" banner, add a small toolbar button:
+  - If `currentUser.isActive` → "I'm sitting out" (taps → confirm sheet → `selfBenchToggle()`).
+  - If not active → "I'm back in" button.
+- **Participant History tab**: each completed match row gains a tappable "…" menu → "Request correction" → opens `CorrectionRequestSheet` with the existing scores prefilled.
+- **Organizer view**: a new icon button in the toolbar with a badge showing `pendingCorrectionRequests.count`. Tap → `CorrectionInboxView` listing each pending request with Approve / Dismiss.
+
+New files:
+- `Features/Tournament/CorrectionRequestSheet.swift` — two number fields + optional note + Submit.
+- `Features/Tournament/CorrectionInboxView.swift` — list of pending requests; rows show match summary + proposed change diff.
+
+#### 17.5 Security rules
+
+```
+match /squads/{sid}/tournaments/{tid}/sessions/{ssid} {
+  allow update: if request.auth.uid == resource.data.createdBy
+                || (
+                    // self-bench: participant toggling only their own player row
+                    request.auth.uid in resource.data.participantUserIDs
+                    && onlyOwnPlayerActiveFieldChanged()
+                );
+}
+
+match /squads/{sid}/tournaments/{tid}/sessions/{ssid}/correctionRequests/{rid} {
+  allow read: if request.auth.uid in get(/…/sessions/$(ssid)).data.participantUserIDs
+              || request.auth.uid == get(/…/sessions/$(ssid)).data.createdBy;
+  allow create: if request.auth.uid == request.resource.data.requestedBy
+                && request.auth.uid in get(/…/sessions/$(ssid)).data.participantUserIDs;
+  allow delete: if request.auth.uid == get(/…/sessions/$(ssid)).data.createdBy
+                || request.auth.uid == resource.data.requestedBy;
+}
+
+match /squads/{sid}/tournaments/{tid}/sessions/{ssid}/matches/{mid} {
+  // existing organizer-only write rule unchanged — corrections still go through organizer approval
+}
+```
+
+The `onlyOwnPlayerActiveFieldChanged()` helper: compare `request.resource.data.players` to `resource.data.players` and assert exactly one element differs, only in `isActive`, and that element's `userID == request.auth.uid`. Implemented as a Firestore rule function.
+
+If that helper is too gnarly to express in rules, fallback: store `isActive` in a per-player subcollection (`sessions/{ssid}/playerStates/{userID}`) instead of inlined in `players[]`. Cleaner rule, costs one extra read on session load. Decide during build step 1.
+
+#### 17.6 Build order
+
+1. **Self-bench, stub-only.** Add `setSelfBench` to `TournamentServicing` + `StubTournamentService`. Wire UI toggle in participant Round tab. Verify rotation respects `isActive` (already does — `recomputeReachableTiles`-equivalent logic in `TournamentRotationEngine` already filters inactive players).
+2. **Self-bench, Firebase + rules.** Implement `setSelfBench` in `FirebaseTournamentService`. Pick the rules approach (inline-array vs subcollection) and write the matching security rules. 2-device QA.
+3. **Correction request submission.** Add subcollection model + stub + Firebase create. Add `CorrectionRequestSheet` to participant History tab.
+4. **Organizer inbox.** Add `observeCorrectionRequests` stream + `CorrectionInboxView` + toolbar badge.
+5. **Approve / dismiss.** Implement the batched write that flips the match result, recomputes leaderboard deltas, and deletes the request. Edge case: organizer approves while player has already played another match — the `lastPlayedAt` stamps stay (only wins/losses flip).
+6. **2-device QA.** Organizer on A, participant on B. Bench → unbench → submit correction → organizer approves → all clients see the corrected score.
+
+#### 17.7 Done when
+
+- A participant can mark themselves benched without bothering the organizer; rotation skips them on the next round.
+- A participant can request a score correction on any completed match; the organizer sees a clear diff and one-tap approve/dismiss.
+- Approving correctly updates: the match doc, both teams' player win/loss totals, `lastPlayedAt` stamps unchanged, leaderboard deltas applied, request doc deleted.
+- Dismissing simply deletes the request — no notification, no record.
+- Security rules block: a participant from editing another player's `isActive`, a non-participant from creating a correction request, anyone from writing the match doc directly.
+- Killing and reopening the app preserves all of the above (Firestore-backed).
+
+#### 17.8 Out of scope / follow-ups
+
+- Self-scoring (a participant submitting the result of a fresh match) — much harder consensus problem, defer.
+- Notifications when a correction request lands or is resolved — needs M6 push.
+- Audit log of resolved corrections.
+- Multi-step approval (e.g., both teams' captains must agree) — over-engineered for friend-group play.
+- Participant-initiated "I have to leave entirely" (which would clear them from the roster, not just bench). Current bench-toggle is sufficient; full removal stays organizer-only.
+
+---
+
+---
+
+### Milestone 18: Scheduled game days + RSVP + host check-in 📋 PLANNED
+
+Goal:
+- Let the host schedule a game day in advance ("Tuesday 8pm, 2 courts"). Squad members RSVP themselves. On the day, **the host marks each arriving player as checked in** by tapping their name in the registration list. The roster for the running session is auto-populated from check-ins, not from typing names. The host can also check players in *after* the session is already running, and the late arrivals join the rotation immediately.
+
+Motivation:
+- Today the Game tab is reactive: someone shows up at the gym, opens the app, taps "New session", types names. This wastes the network effect — nobody knows a session is happening unless they're already there.
+- Scheduling forward turns the Game tab into a reason to *open* the app: "Am I going Tuesday?" "Who's confirmed?" "When does it start?". That's a recurring habitual visit no other surface in the app currently triggers.
+- Host-driven check-in collapses the current "type each name" friction into a single-tap toggle on the pre-existing RSVP list. The host stops being a name-typist.
+- Late check-in (the explicit requirement): once the session is `active`, the host tapping a player's check-in toggle appends them to the roster mid-session. The rotation engine already gives `lastPlayedAt = 0` players priority, so they're naturally up next.
+
+Scope decisions (locked):
+- **RSVP is self-service. Check-in is host-only.** Squad members RSVP themselves (Yes / Maybe / No). Only the host (`session.createdBy`) can mark someone as checked in. Players cannot check themselves in — this prevents fake or accidental check-ins, mirrors the M10 organizer-writes-only philosophy, and removes all the security-rule complexity around participant-writes-to-`players[]`.
+- **One-off scheduled days only** in v1. No recurring events (defer to v2 — handle "every Tuesday" via duplicate-and-edit until demand justifies more).
+- **No max-capacity / waitlist** in v1. Display registration count; don't gate. (Defer cap + waitlist.)
+- **No reminders or push notifications** — blocked on M6. Compensate with a Feed banner ("📅 Game tonight at 8pm — 5 confirmed").
+- **Squad-scoped only.** Friends-not-in-squad can't be invited to a scheduled day in v1. They join via the existing M13 roster picker once the session is `active`. (Reasoning: keeps the registration list bounded to the squad's member set, simplifies security rules.)
+- **Guests stay host-managed.** No userID = no self-RSVP. Host adds guests via the existing roster picker at session start, same as today.
+- **Host always counts as checked-in.** When the host taps "Start session", they're added to the roster automatically — no need to RSVP or check themselves in.
+- **Cancellation is allowed and visible.** Cancelled days stay in the list with a `cancelled` badge for one week, then disappear. (Don't silently delete — people who RSVPed deserve to see "this got cancelled".)
+- **No editing time after RSVPs exist** in v1. To change time, host cancels and reschedules. (Defer the "edit and notify everyone" flow.)
+
+Depends on: M13 (multi-session Game + roster) shipped. Pairs naturally with M17 (self-bench reuses the same self-write pattern).
+
+#### 18.1 Data model changes
+
+`TournamentSession` — extend the existing `status` enum:
+```swift
+enum TournamentStatus: String, Codable, Sendable {
+    case scheduled    // NEW — exists in advance, no roster yet
+    case active       // existing — currently being played
+    case finished     // existing
+    case cancelled    // NEW — host cancelled before it started
+}
+```
+
+New fields on `TournamentSession`:
+```swift
+var scheduledStart: Date?        // nil for legacy/walk-up sessions; set for scheduled days
+var location: String?            // free-text, optional ("Court 3, Eastern Park")
+```
+
+Why nullable `scheduledStart`: existing sessions (M13) were created walk-up style. New flow sets it. Old data stays valid.
+
+New subcollection:
+```
+squads/{squadID}/tournaments/{tournamentID}/sessions/{sessionID}/registrations/{userID}
+  - userID, name, avatarURL?
+  - status: "yes" | "maybe" | "no"           // self-written by the participant
+  - registeredAt: Timestamp
+  - checkedInAt: Timestamp?                  // host-written. nil = host hasn't checked them in
+  - checkedInBy: String?                     // host's userID (audit trail)
+  - addedToRoster: Bool                      // true once they've been pulled into players[]
+```
+
+Single doc per user, doc ID = userID (dedupe). `status` captures the planning intent (self-written by the registrant); `checkedInAt` captures the host marking them present (host-only write); `addedToRoster` prevents double-adding when the host checks someone in mid-session.
+
+Why both `checkedInAt` AND `addedToRoster`: the host might check a player in *before* tapping Start, in which case we just stamp `checkedInAt` and the player is materialized into `players[]` only when Start runs. After the session is `active`, checking someone in does both writes in one batch. `addedToRoster` is the idempotency guard.
+
+#### 18.2 Domain layer changes
+
+`TournamentServicing` additions:
+
+```swift
+// MARK: - Scheduled day lifecycle
+
+/// Creates a session in `scheduled` status. No roster yet.
+func scheduleSession(
+    in tournament: Tournament,
+    title: String,
+    scheduledStart: Date,
+    courts: Int,
+    location: String?
+) async throws -> TournamentSession
+
+/// Host-only. Cancels a scheduled day before it starts.
+func cancelScheduledSession(_ session: TournamentSession) async throws -> TournamentSession
+
+/// Host-only. Transitions scheduled → active and seeds players from currently-checked-in registrations.
+func startScheduledSession(_ session: TournamentSession) async throws -> TournamentSession
+
+// MARK: - RSVP (participant self-action)
+
+/// Self-only. The current user sets their own RSVP (yes / maybe / no).
+/// Creates the registration doc if missing.
+func setRegistrationStatus(
+    _ status: RegistrationStatus,
+    for session: TournamentSession
+) async throws
+
+// MARK: - Check-in (host-only)
+
+/// Host-only. Idempotent. Stamps checkedInAt for the given user.
+/// If session is `active`, also appends them to players[] and flips addedToRoster in one batch.
+/// If session is `scheduled`, just stamps checkedInAt — the player is materialized into the
+/// roster when the host taps Start.
+/// Allowed for any squad member, even one who hasn't RSVPed (creates the registration doc on the fly).
+func checkInPlayer(userID: String, in session: TournamentSession) async throws -> TournamentSession
+
+/// Host-only. Reverses a check-in. Only allowed if the player has not yet been added to the roster
+/// (i.e., session still `scheduled` OR `addedToRoster == false`). Once a player is in the rotation,
+/// removal goes through the existing roster-edit path, not check-in undo.
+func undoCheckIn(userID: String, in session: TournamentSession) async throws
+
+func observeRegistrations(for session: TournamentSession) -> AsyncStream<[Registration]>
+
+/// Host-only. Removes someone's registration entirely. Doesn't touch the roster if they were already added.
+func removeRegistration(_ registration: Registration, from session: TournamentSession) async throws
+```
+
+New file `Domain/Models/Registration.swift`:
+```swift
+enum RegistrationStatus: String, Codable, Sendable {
+    case yes
+    case maybe
+    case no
+}
+
+struct Registration: Identifiable, Codable, Equatable, Hashable, Sendable {
+    let id: String              // == userID
+    let userID: String
+    var name: String
+    var avatarURL: URL?
+    var status: RegistrationStatus
+    let registeredAt: Date
+    var checkedInAt: Date?
+    var addedToRoster: Bool
+}
+```
+
+#### 18.3 Data layer changes
+
+`StubTournamentService`:
+- New `[sessionID: [Registration]]` dictionary.
+- `scheduleSession` creates a session with empty `players`, status `scheduled`, the given `scheduledStart`.
+- `setRegistrationStatus` upserts the registration doc for the calling user.
+- `checkInPlayer` stamps `checkedInAt = .now`, `checkedInBy = currentUserID`. If session is `active`, also calls existing `addPlayers([TournamentPlayer(...)], to:)` and flips `addedToRoster`.
+- `undoCheckIn` clears `checkedInAt` / `checkedInBy` if `addedToRoster == false`; throws otherwise.
+- `startScheduledSession` filters registrations where `checkedInAt != nil`, maps them to `TournamentPlayer`, sets `addedToRoster = true` on each, transitions session to `active`.
+
+`FirebaseTournamentService`:
+- `scheduleSession` — single `setData` on the new session doc.
+- `setRegistrationStatus` — `setData(merge: true)` on `registrations/{uid}` for the *calling* user only.
+- `checkInPlayer` — batch: stamp `checkedInAt` + `checkedInBy` on `registrations/{userID}` (creating the doc if missing — covers walk-up squad members who never RSVPed). **If** session is `active`, append to `players` array on session doc + flip `addedToRoster`. **Else** just the stamp.
+- `undoCheckIn` — single update clearing `checkedInAt` / `checkedInBy`, gated on `addedToRoster == false`.
+- `startScheduledSession` — transaction: read all registrations with `checkedInAt != nil`, build `players[]`, write session with `status = active` and `players` populated, batch-flip `addedToRoster = true` on those registrations.
+- `observeRegistrations` — snapshot listener wrapped in `AsyncStream`.
+
+`FirestorePaths`: `registrations(_:_:_:)`, `registration(_:_:_:_:)`.
+
+#### 18.4 Feature layer changes
+
+**Game tab landing:**
+- Add a third segment to the existing `Active | Past` control: `Upcoming | Active | Past`.
+- `Upcoming` = sessions with `status == .scheduled` (or `.cancelled` within last 7 days), sorted by `scheduledStart` ascending.
+- Each row shows: title, date/time, location (if set), `N registered · M checked in`, host name.
+
+**New files in `Features/Tournament/`:**
+
+- `ScheduleGameDaySheet.swift` — date picker (default: today + 1 day, evening), time picker, courts stepper, optional location text field, title field (default: "Game day"). Single CTA: "Schedule".
+- `ScheduledDayDetailView.swift` — header with date/time/location, registration list grouped by status (Going / Maybe / Not coming).
+  - **For all squad members:** RSVP buttons at top (Yes / Maybe / No).
+  - **For the host only:** each registration row has a tappable check-in toggle (⬜ → ✅) and an "Add walk-up" button at the bottom of the list that opens a sheet listing remaining squad members who haven't registered. Tap a name to mark them checked in.
+  - **For the host only:** "Start session" button (enabled when `now >= scheduledStart - 30min` OR always available with confirm), "Cancel" / "Edit" actions.
+  - Each registered user has a check-in indicator (✅ checked in / ⏳ awaiting).
+- `ScheduledDayBanner.swift` — informational banner shown on **Feed tab** when there's a scheduled session today: "📅 Game tonight at 8pm — 5 going". Tap → opens `ScheduledDayDetailView`. No check-in CTA in the banner since players can't self-check-in.
+
+**Existing file edits:**
+
+- `Features/Tournament/TournamentView.swift` — handle `status == .scheduled` by routing to `ScheduledDayDetailView` instead of `TournamentActiveView`. Handle `.cancelled` with a read-only banner.
+- `Features/Tournament/TournamentViewModel.swift` — add `registrations: [Registration]`, `myRegistration: Registration?`, `isHost: Bool`, `setRSVP(_:)`, `hostCheckIn(userID:)`, `hostUndoCheckIn(userID:)`, `startSessionTapped()`, `cancelSessionTapped()`.
+- `Features/Feed/FeedView.swift` — show `ScheduledDayBanner` at top when `nextScheduledSession?.scheduledStart` is within today.
+- `Features/Feed/FeedViewModel.swift` — query `tournamentService` for the next scheduled session of the active squad on Feed appear.
+
+**Late check-in path** (the user's explicit requirement, host-driven):
+- Frank shows up 20 minutes after Alice tapped "Start session". The session is now `active`. Alice opens the session detail.
+- Alice sees Frank's registration row with the ⬜ check-in toggle. She taps it → `checkInPlayer(userID: frank, ...)` runs the `active`-branch: stamps `checkedInAt`, appends Frank to `players[]` with `played: 0, lastPlayedAt: 0`. Next round generation picks him first.
+- If Frank *never* RSVPed but is a squad member, Alice taps "Add walk-up" → picks Frank from the squad-member list → same code path runs (registration doc created on the fly with `status = yes, checkedInAt = .now`, then materialized into the roster).
+- If Frank is not a squad member at all, the existing M13 roster picker (Friends tab / Guest tab) is the path — unchanged from today.
+
+#### 18.5 Security rules
+
+Host-only check-in keeps the rule shape clean. There is **no participant self-write to `session.players[]`** anywhere — that path was the rule-complexity risk and it's been designed out.
+
+```
+match /squads/{sid}/tournaments/{tid}/sessions/{ssid} {
+  allow read: if isSquadMember(sid);
+  // Only the host writes the session doc — no exception for participants.
+  allow write: if request.auth.uid == resource.data.createdBy;
+}
+
+match /squads/{sid}/tournaments/{tid}/sessions/{ssid}/registrations/{uid} {
+  allow read: if isSquadMember(sid);
+
+  // Self can write status / registeredAt only — never checkedInAt or addedToRoster.
+  allow create: if request.auth.uid == uid
+                && request.resource.data.userID == uid
+                && request.resource.data.checkedInAt == null
+                && request.resource.data.addedToRoster == false;
+
+  allow update: if request.auth.uid == uid
+                && onlyRSVPFieldsChanged()   // status, name, avatarURL only
+                || request.auth.uid == get(/…/sessions/$(ssid)).data.createdBy;
+  // Host can also CREATE a registration on behalf of a walk-up squad member
+  // (squad-member-only — friends-not-in-squad use the existing roster picker).
+  allow create: if request.auth.uid == get(/…/sessions/$(ssid)).data.createdBy
+                && isSquadMember(sid);
+
+  allow delete: if request.auth.uid == get(/…/sessions/$(ssid)).data.createdBy;
+}
+```
+
+`onlyRSVPFieldsChanged()` is a small rule helper that compares the diff of changed fields against the allow-list `{status, name, avatarURL}`. Any attempt by a non-host to flip `checkedInAt`, `checkedInBy`, or `addedToRoster` is rejected at the rule layer.
+
+This is the same shape as the existing M10 organizer-writes-only rule — no new patterns introduced.
+
+#### 18.6 Build order
+
+1. **Domain models + status extension.** Add `scheduled`/`cancelled` cases, `scheduledStart`, `location`, `Registration` model. Migrate existing call sites that switch on `status` (currently exhaustive on `active`/`finished`).
+2. **Stub-only schedule + RSVP + host check-in.** Implement `scheduleSession`, `setRegistrationStatus`, `checkInPlayer`, `undoCheckIn`, `startScheduledSession` in `StubTournamentService`. Build `ScheduleGameDaySheet` + `ScheduledDayDetailView` using stubs (with both host and non-host modes). Verify the full flow in previews.
+3. **Firebase + rules.** Implement the same in `FirebaseTournamentService`. Write the host-only rules (clean — no participant-writes-to-players concern).
+4. **Game tab Upcoming segment.** Wire the third segment, route scheduled rows to detail.
+5. **Feed banner.** `ScheduledDayBanner` on Feed when a scheduled session exists today (informational only).
+6. **Late check-in path.** End-to-end QA with three devices: host (A) starts session, then mid-session checks in registered player (B) and walk-up player (C). Both should appear in the rotation, prioritized by `lastPlayedAt = 0`.
+7. **Cancellation.** Host taps Cancel, status flips, all registered users see `.cancelled` badge in Upcoming.
+
+#### 18.7 Done when
+
+- Host can schedule a game day with date, time, courts, optional location.
+- Squad members can see upcoming days in the Game tab and tap to RSVP themselves (Yes / Maybe / No).
+- Players cannot check themselves in — the check-in toggle on each registration row is visible and tappable only when `currentUser.uid == session.createdBy`. Security rules reject any non-host write attempt.
+- The Feed shows an informational banner when a scheduled session is happening today.
+- On the day, the host taps the check-in toggle next to each arriving player. The host's "Start session" button then populates the roster from checked-in registrations automatically.
+- Mid-session check-ins (host taps a player's toggle after Start) immediately add them to the rotation, with rotation priority preserved (`lastPlayedAt = 0` ⇒ next match).
+- Walk-up check-ins (host adds a squad member who never RSVPed) work via "Add walk-up".
+- Host can cancel a scheduled day; the cancelled status is visible to RSVPed users.
+- Killing and reopening the app preserves all of the above.
+
+#### 18.8 Out of scope / follow-ups
+
+- **Self check-in.** Explicitly excluded — only the host checks players in. Reconsider only if hosts complain about tap-fatigue at large sessions (12+ players). If revisited, the cleanest path is a Cloud Function that watches `registrations.checkedInAt` writes, gated to `request.auth.uid == registration.userID`, and only the function itself touches `session.players[]`. Until then: host-only, full stop.
+- Recurring events ("every Tuesday 8pm").
+- Reminders / push notifications (blocked on M6).
+- Capacity caps + waitlist.
+- Editing a scheduled day's time after RSVPs exist (host must cancel + reschedule).
+- Inviting friends-not-in-squad to a scheduled day (use M13 roster picker at session start instead).
+- Cross-squad scheduled days.
+- Calendar integration (export to iOS Calendar / Google Calendar).
+
+---
 
 ## 6. Recommended acceptance checks
 

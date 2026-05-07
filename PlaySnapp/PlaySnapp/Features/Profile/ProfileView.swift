@@ -4,6 +4,8 @@ struct ProfileView: View {
     @EnvironmentObject private var environment: AppEnvironment
     @EnvironmentObject private var router: AppRouter
     @StateObject private var viewModel = ProfileViewModel()
+    @State private var showingProfileQR = false
+    @State private var squadForQR: Squad?
 
     var body: some View {
         NavigationStack {
@@ -45,6 +47,21 @@ struct ProfileView: View {
                                 }
                             }
                         }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button {
+                                squadForQR = squad
+                            } label: {
+                                Label("QR Code", systemImage: "qrcode")
+                            }
+                            .tint(.orange)
+
+                            ShareLink(
+                                item: "Join my squad \"\(squad.name)\" on PlaySnapp:\nplaysnapp://join?code=\(squad.inviteCode)"
+                            ) {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                            .tint(.blue)
+                        }
                     }
 
                     Button {
@@ -65,6 +82,7 @@ struct ProfileView: View {
                     NavigationLink {
                         FriendsView()
                             .environmentObject(environment)
+                            .environmentObject(router)
                     } label: {
                         Label("Friends", systemImage: "person.2")
                     }
@@ -87,6 +105,14 @@ struct ProfileView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Edit") { viewModel.startEditing() }
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingProfileQR = true
+                    } label: {
+                        Image(systemName: "qrcode")
+                    }
+                    .disabled(viewModel.user == nil)
+                }
             }
             .sheet(isPresented: $viewModel.isEditingProfile) {
                 ProfileEditSheet(viewModel: viewModel)
@@ -96,11 +122,27 @@ struct ProfileView: View {
                 AddSquadSheet(viewModel: viewModel)
                     .environmentObject(environment)
             }
+            .sheet(isPresented: $showingProfileQR) {
+                if let user = viewModel.user {
+                    ProfileQRView(user: user)
+                }
+            }
+            .sheet(item: $squadForQR) { squad in
+                SquadQRView(squad: squad)
+            }
             .task {
                 await viewModel.load(
                     profileService: environment.userProfileService,
                     squadService: environment.squadService
                 )
+            }
+            .onChange(of: router.pendingInviteCode) { _, code in
+                guard let code else { return }
+                viewModel.addSquadMode = .join
+                viewModel.addSquadInput = code
+                viewModel.addSquadError = nil
+                viewModel.isAddingSquad = true
+                router.pendingInviteCode = nil
             }
         }
     }

@@ -10,6 +10,9 @@ struct PlaySnapApp: App {
             RootView()
                 .environmentObject(router)
                 .environmentObject(environment)
+                .onOpenURL { url in
+                    router.handleInviteURL(url)
+                }
                 .task {
                     await router.bootstrap(using: environment.authService)
                     // Attempt device registration once we know the user is authenticated.

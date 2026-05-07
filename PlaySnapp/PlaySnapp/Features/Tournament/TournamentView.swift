@@ -290,7 +290,7 @@ struct TournamentActiveView: View {
         }
         .onChange(of: vm.session?.status) { old, new in
             if old == .active && new == .finished {
-                selectedTab = 0 // switch to Summary when day ends
+                selectedTab = 0
             }
         }
     }

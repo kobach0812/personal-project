@@ -52,6 +52,13 @@ struct SquadSetupView: View {
                 }
             }
             .navigationTitle("Your squad")
+            .onAppear {
+                if let code = router.pendingInviteCode {
+                    viewModel.mode = .join
+                    viewModel.input = code
+                    router.pendingInviteCode = nil
+                }
+            }
         }
     }
 }

@@ -43,6 +43,19 @@ final class FriendsViewModel: ObservableObject {
         }
     }
 
+    func sendRequest(toUserID userID: String, currentUserName: String, friendService: FriendServicing) async {
+        isSendingRequest = true
+        defer { isSendingRequest = false }
+        do {
+            try await friendService.sendFriendRequest(to: userID, fromName: currentUserName)
+            sentRequestUserIDs.insert(userID)
+        } catch FriendServiceError.requestAlreadyExists {
+            sentRequestUserIDs.insert(userID)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func sendRequest(to user: AppUser, currentUserName: String, friendService: FriendServicing) async {
         isSendingRequest = true
         defer { isSendingRequest = false }
@@ -80,6 +93,7 @@ final class FriendsViewModel: ObservableObject {
 
 struct FriendsView: View {
     @EnvironmentObject private var env: AppEnvironment
+    @EnvironmentObject private var router: AppRouter
     @StateObject private var vm = FriendsViewModel()
     @State private var currentUserName: String = ""
 
@@ -107,11 +121,19 @@ struct FriendsView: View {
             Task { await vm.search(friendService: env.friendService) }
         }
         .task {
-            // Grab the user's display name for use in friend request sends.
             if let user = try? await env.userProfileService.fetchCurrentUser() {
                 currentUserName = user.name
             }
             await vm.load(friendService: env.friendService)
+
+            if let targetID = router.pendingAddUserID {
+                router.pendingAddUserID = nil
+                await vm.sendRequest(
+                    toUserID: targetID,
+                    currentUserName: currentUserName,
+                    friendService: env.friendService
+                )
+            }
         }
     }
 

@@ -16,6 +16,20 @@ struct TournamentRoundView: View {
                         PlayerStatusCard(vm: vm)
                     }
 
+                    if !vm.isOrganizer,
+                       let session = vm.session,
+                       let user = vm.currentUser,
+                       session.participantUserIDs.contains(user.id),
+                       let myPlayer = vm.myPlayer,
+                       session.status == .active {
+                        SelfBenchButton(
+                            isActive: myPlayer.isActive,
+                            isOnCourt: vm.myPlayerIsOnCourt
+                        ) {
+                            Task { await vm.selfBenchToggle(tournamentService: env.tournamentService) }
+                        }
+                    }
+
                     if vm.isOrganizer && session.status == .active {
                         Button("End Day") {
                             Task { await vm.endDay(tournamentService: env.tournamentService) }
@@ -237,5 +251,30 @@ struct PlayerStatusCard: View {
         .background(Color(.systemGray6))
         .cornerRadius(14)
         .padding(.horizontal)
+    }
+}
+
+// MARK: - Self-bench toggle (participant only)
+
+private struct SelfBenchButton: View {
+    let isActive: Bool
+    let isOnCourt: Bool
+    var onTap: () -> Void
+
+    var body: some View {
+        Button {
+            onTap()
+        } label: {
+            Label(
+                isActive ? "Sit out this rotation" : "Re-enter rotation",
+                systemImage: isActive ? "figure.stand.line.dotted.figure.stand" : "figure.run"
+            )
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .tint(isActive ? .secondary : .orange)
+        .disabled(isOnCourt)
+        .padding(.horizontal)
+        .padding(.bottom, 8)
     }
 }

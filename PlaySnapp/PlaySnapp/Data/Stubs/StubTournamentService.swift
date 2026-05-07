@@ -107,6 +107,10 @@ actor StubTournamentService: TournamentServicing {
 
     // MARK: - In-session operations
 
+    nonisolated func observeSession(squadID: String, tournamentID: String, sessionID: String) -> AsyncStream<TournamentSession> {
+        AsyncStream { continuation in continuation.finish() }
+    }
+
     func generateNextRound(for session: TournamentSession) async throws -> TournamentSession {
         var updated = session
         updated.currentRound = TournamentRotationEngine.fillAllCourts(session: updated)
@@ -143,6 +147,19 @@ actor StubTournamentService: TournamentServicing {
         updated.players = players
         upsertSession(updated)
         return updated
+    }
+
+    // MARK: - Participant self-actions
+
+    func setSelfBench(playerID: String, isActive: Bool, for session: TournamentSession) async throws -> TournamentSession {
+        guard var players = tournaments
+            .first(where: { $0.id == session.tournamentID })?
+            .sessions.first(where: { $0.id == session.id })?
+            .players,
+              let idx = players.firstIndex(where: { $0.id == playerID })
+        else { return session }
+        players[idx].isActive = isActive
+        return try await updatePlayers(players, for: session)
     }
 
     // MARK: - Private helpers
