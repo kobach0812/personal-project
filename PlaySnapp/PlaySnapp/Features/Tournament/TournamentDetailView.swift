@@ -45,12 +45,7 @@ struct TournamentDetailView: View {
             switch selectedTab {
             case 0:  TournamentBillboardView(players: tournament.players)
             case 1:  daysListView
-            default:
-                ContentUnavailableView(
-                    "No bracket tournaments yet",
-                    systemImage: "trophy",
-                    description: Text("Bracket tournaments coming soon.")
-                )
+            default: BracketListView(tournament: tournament, currentUser: currentUser)
             }
         }
         .navigationTitle(tournament.title.isEmpty ? "Tournament" : tournament.title)
