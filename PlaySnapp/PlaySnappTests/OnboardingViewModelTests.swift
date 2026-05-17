@@ -10,7 +10,6 @@ struct OnboardingViewModelTests {
         let progressService = OnboardingProgressServiceStub()
 
         viewModel.name = "Andy"
-        viewModel.selectedSport = .football
 
         await viewModel.saveProfile(
             progressService: progressService,

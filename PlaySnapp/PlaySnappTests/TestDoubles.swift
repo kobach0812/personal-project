@@ -61,7 +61,7 @@ actor OnboardingProgressServiceStub: OnboardingProgressServicing {
     var shouldFailJoin = false
     var shouldFailWidgetIntro = false
 
-    func completeProfile(name: String, sport: Sport) async throws -> AppSession {
+    func completeProfile(name: String) async throws -> AppSession {
         if shouldFailProfileSave {
             throw TestFailure.expected
         }
@@ -90,7 +90,7 @@ actor SquadServiceStub: SquadServicing {
     var createResult = Squad(
         id: "squad-1",
         name: "Tuesday Crew",
-        sport: .football,
+        createdBy: "test-user",
         memberIDs: ["test-user"],
         inviteCode: "PLAY1",
         createdAt: .now
@@ -98,15 +98,16 @@ actor SquadServiceStub: SquadServicing {
     var joinResult = Squad(
         id: "squad-2",
         name: "Join Crew",
-        sport: .football,
-        memberIDs: ["test-user"],
+        createdBy: "other-user",
+        memberIDs: ["test-user", "other-user"],
         inviteCode: "JOIN1",
         createdAt: .now
     )
     var shouldFailCreate = false
     var shouldFailJoin = false
+    var activeSquadID: String?
 
-    func createSquad(name: String, sport: Sport) async throws -> Squad {
+    func createSquad(name: String) async throws -> Squad {
         if shouldFailCreate {
             throw TestFailure.expected
         }
@@ -124,5 +125,13 @@ actor SquadServiceStub: SquadServicing {
 
     func fetchCurrentSquad() async throws -> Squad? {
         createResult
+    }
+
+    func fetchAllSquads() async throws -> [Squad] {
+        [createResult]
+    }
+
+    func setActiveSquad(id: String) async throws {
+        activeSquadID = id
     }
 }
