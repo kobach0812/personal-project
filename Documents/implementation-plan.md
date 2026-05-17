@@ -316,9 +316,9 @@ The practical order is:
 10. Polish
 11. Fair-play rotation tournament
 
-## 5. Current state (as of 2026-05-02)
+## 5. Current state (as of 2026-05-07)
 
-Milestones 0–5, 7, 9–13 complete. Milestone 6 (push notifications) parked pending paid Apple Developer account. Milestone 8 (video) deferred.
+Milestones 0–5, 7, 9–14, 18, 19, 20 complete. M17 partially complete (self-bench done; score correction deferred). Milestone 6 (push notifications) parked pending paid Apple Developer account. Milestone 8 (video) deferred. M15, M16 skipped by choice.
 
 **Completed since last update:**
 - M9: Sign-out, profile edit, loading/error states, widget onboarding
@@ -326,6 +326,12 @@ Milestones 0–5, 7, 9–13 complete. Milestone 6 (push notifications) parked pe
 - M11: Friends social graph (search, request, accept/decline, friends list)
 - M12: Multi-squad membership, active squad switcher in Profile
 - M13: Multi-session Game tab, `TournamentDetailView` session list, `StartDaySheet` with roster picker, `PlayerPickerSheet` (Squad / Friends / Guest tabs), day summary view for finished sessions, `matches` subcollection in Firestore, participant live view
+- M14: Squad invite link (`playsnapp://join?code=XXX`), profile QR (`playsnapp://add?userID=XXX`), squad QR code sharing, `QRCodeGenerator`, `ProfileQRView`, `SquadQRView`
+- M17 (partial): Participant self-bench toggle in Round tab — "Sit out this rotation" / "Re-enter rotation" button, writes `isActive` flag to Firestore via `setSelfBench`
+
+**Bug fixes (2026-05-07):**
+- Real-time session sync: `observeSession` Firestore snapshot listener added to `TournamentServicing` + Firebase implementation. All open devices update live when any device writes to the session doc
+- Stale rotation bug (benched player still getting picked): `recordResult` now re-fetches fresh `players` array from Firestore before running the rotation engine, so bench changes from other devices are respected
 
 **Remaining open work:**
 - M6: Push notifications — blocked on paid Apple Developer account ($99/year)
@@ -333,13 +339,26 @@ Milestones 0–5, 7, 9–13 complete. Milestone 6 (push notifications) parked pe
 - Avatar upload — backend protocol ready (`StorageServicing.uploadAvatar`); UI needs `PhotosPicker` wiring
 - TestFlight submission — blocked on paid Apple Developer account
 - Sign in with Apple — parked in `AppleSignInProvider.swift`; requires paid account + Push Notifications capability
+- Score correction requests (M17 remainder) — deferred; Firestore write/read path needs debugging before re-implementing
 
-**Next milestone candidates (growth + retention focus):**
-- M14: Squad invite link (deep link + share sheet) — unlock organic squad growth
-- M15: Weekly recap card (auto-generated, shareable image) — leave-the-app shareability
-- M16: Play streaks — cheapest possible retention mechanic
-- M17: Participant self-actions (sitting out, requesting score correction) — Game tab depth
-- M18: Scheduled game days + RSVP + check-in — turn Game tab into the reason people open the app
+**Completed since last update (cont.):**
+- M18: Scheduled game days + RSVP + host check-in
+  - `TournamentStatus` extended with `.scheduled` / `.cancelled`
+  - `TournamentSession` gains `scheduledStart: Date?` and `location: String?`
+  - `Registration` model (yes/maybe/no RSVP + host check-in stamp)
+  - `ScheduleGameDaySheet` — host picks date/time/courts/location
+  - `ScheduledDayDetailView` — RSVP buttons for all; check-in toggles for host only; "Start Session" auto-populates roster from checked-in registrations; late check-in mid-session adds player to rotation immediately
+  - `ScheduledDayBanner` on Feed tab — shows today's scheduled game days
+  - `Firestore: registrations/{userID}` subcollection with `observeRegistrations` real-time stream
+  - `TournamentDetailView` updated: "Schedule Game Day" in ⋯ menu, smart session router (scheduled→ScheduledDayDetailView, active/finished→DayDetailView), updated DayRow shows date/location/status colour
+
+**Next milestone candidates:**
+- **M21**: Bracket Tournament backend — models, service, stub + Firebase
+- **M22**: Bracket Tournament setup flow — create bracket UI
+- **M23**: Bracket Tournament group round-robin — match scoring + live standings
+- **M24**: Bracket Tournament configure knockout — advance count + best-of + random pairing
+- **M25**: Bracket Tournament visual bracket — QF → SF → Final UI with set entry
+- M17 remainder: Score correction requests (deferred; Firestore debug needed first)
 
 **Future candidates (deferred or blocked):**
 - Push notifications (blocked: paid Apple Developer account)
@@ -1492,6 +1511,294 @@ This is the same shape as the existing M10 organizer-writes-only rule — no new
 - Inviting friends-not-in-squad to a scheduled day (use M13 roster picker at session start instead).
 - Cross-squad scheduled days.
 - Calendar integration (export to iOS Calendar / Google Calendar).
+
+---
+
+### Milestone 19: Game tab structural refactor ✅ COMPLETE
+
+Goal:
+- Lay the foundation for M20+ by restructuring the Game tab. Small, non-breaking change. No new functionality.
+
+Tasks:
+- Rename Game tab navigation title from "Tournaments" to "Game"
+- Add a third tab segment inside `TournamentDetailView`: `Board / Days / Tournaments`
+- The new "Tournaments" tab shows an empty placeholder (`ContentUnavailableView`) — populated in M21+
+
+Files:
+- Edit `TournamentView.swift` — rename navigation title
+- Edit `TournamentDetailView.swift` — add 3rd tab segment + placeholder content
+
+Done when:
+- Game tab top header reads "Game"
+- Inside any tournament, three tabs are visible: Board, Days, Tournaments
+- Tournaments tab shows "No bracket tournaments yet" empty state
+
+---
+
+### Milestone 20: Fixed Teams within day sessions 📋 PLANNED
+
+Goal:
+- Allow the host to define fixed pairs at session start (e.g., Alice + Bob always play together). Replaces fair-play rotation with round-robin between fixed teams. Used in casual leagues where partnerships are pre-arranged.
+
+Scope:
+- New mode picker on `StartDaySheet`: **Rotation** (existing) vs **Fixed Teams** (new)
+- Fixed Teams mode: host adds teams (name + 2 players each); round-robin schedule generated
+- `MatchCard` and billboard show team names instead of individual player rows
+- Score entry and result recording unchanged (winner = team that won)
+- No mid-session mode switching
+
+Data model:
+```swift
+enum SessionMode: String, Codable, Sendable {
+    case rotation
+    case fixedTeams
+}
+
+struct FixedTeam: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    var name: String
+    var playerIDs: [String]   // exactly 2 player IDs
+}
+
+// TournamentSession additions:
+var mode: SessionMode
+var fixedTeams: [FixedTeam]
+```
+
+New files (1):
+- `Domain/Services/FixedTeamMatchGenerator.swift` — pure round-robin scheduler
+
+Edited files (5):
+- `Domain/Models/TournamentModels.swift` — `SessionMode`, `FixedTeam`, session field additions
+- `Features/Tournament/TournamentDetailView.swift` (`StartDaySheet`) — mode picker + team builder UI
+- `Features/Tournament/TournamentRoundView.swift` (`MatchCard`) — team name display when `mode == .fixedTeams`
+- `Features/Tournament/TournamentBillboardView.swift` — team-based standings
+- `Data/Firebase/FirebaseTournamentService.swift` + `Data/Stubs/StubTournamentService.swift` — serialize/deserialize new fields, branch on `mode` in `recordResult`
+
+Done when:
+- Host can pick Fixed Teams mode and define N teams of 2 players each
+- Round-robin generates: every team plays every other team
+- Billboard ranks teams (not individuals) by W/L
+- Existing Rotation mode unchanged
+
+---
+
+### Milestone 21: Bracket Tournament — backend layer 📋 PLANNED
+
+Goal:
+- Establish data layer for bracket tournaments. No UI yet. Sets up the foundation for M22–M25.
+
+Scope:
+- New domain models, service protocol, stub + Firebase implementations, Firestore paths
+- A "Bracket Tournament" lives nested inside an existing `Tournament` (subcollection: `tournaments/{tournamentID}/brackets/{bracketID}`)
+- Phases: `setup → groupStage → configuringKnockout → knockout → finished`
+
+Data model:
+```swift
+struct BracketTournament: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let parentTournamentID: String
+    let squadID: String
+    let createdBy: String
+    let createdAt: Date
+    var title: String
+    var status: BracketStatus
+    var groups: [BracketGroup]
+    var knockoutBestOf: Int        // set when knockout configured
+    var knockoutMatches: [KnockoutMatch]
+}
+
+enum BracketStatus: String, Codable, Sendable {
+    case setup
+    case groupStage
+    case configuringKnockout
+    case knockout
+    case finished
+}
+
+struct BracketGroup: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    var name: String           // "A", "B", "C"
+    var teams: [FixedTeam]
+    var matches: [GroupMatch]
+    var advanceCount: Int?     // set when host configures knockout
+}
+
+struct GroupMatch: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let teamAID: String
+    let teamBID: String
+    var scoreA: Int?
+    var scoreB: Int?
+    var winnerTeamID: String?
+    var completedAt: Date?
+}
+
+struct KnockoutMatch: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let round: KnockoutRound
+    let position: Int           // for bracket ordering
+    var teamAID: String?        // nil = bye
+    var teamBID: String?
+    var sets: [SetScore]
+    var winnerTeamID: String?
+    var completedAt: Date?
+}
+
+enum KnockoutRound: String, Codable, Sendable {
+    case quarterfinal
+    case semifinal
+    case final
+    case thirdPlace
+}
+
+struct SetScore: Codable, Hashable, Sendable {
+    var teamAScore: Int
+    var teamBScore: Int
+}
+```
+
+New files (4):
+- `Domain/Models/BracketTournamentModels.swift`
+- `Domain/Services/BracketTournamentService.swift` — protocol
+- `Data/Stubs/StubBracketTournamentService.swift`
+- `Data/Firebase/FirebaseBracketTournamentService.swift`
+
+Service protocol methods:
+- `createBracket(in:title:teams:groups:)`
+- `fetchBrackets(for tournament:)`
+- `recordGroupMatchResult(...)`
+- `configureKnockout(bracketID:, advanceCounts:[groupID:Int], bestOf:Int)` — randomizes pairings + assigns byes
+- `recordKnockoutSet(...)`
+- `observeBracket(bracketID:)`
+
+Edited files (3):
+- `Domain/Services/AppEnvironment.swift` — register `bracketTournamentService`
+- `Data/Firebase/FirestorePaths.swift` — `brackets`, `bracket` paths
+- `App/AppEnvironment.swift` — wire service for both stub + Firebase environments
+
+Done when:
+- All bracket models compile
+- Stub creates a bracket, records group results, configures knockout (random pairing tested), records set scores, advances rounds
+- Firebase implementation writes/reads from `tournaments/{tID}/brackets/{bID}` correctly
+- No UI yet — verified via stub + unit-test-style trial
+
+---
+
+### Milestone 22: Bracket Tournament — setup flow 📋 PLANNED
+
+Goal:
+- Host can create a bracket tournament from inside a Tournament's "Tournaments" tab. List view + create sheet.
+
+Scope:
+- `BracketListView` shown inside the Tournaments tab. Lists all bracket tournaments under the parent Tournament. `+` button to create.
+- `CreateBracketSheet`: title → add teams (each: name + 2 players from tournament roster) → create groups → assign each team to a group → "Start Group Stage" button
+- After creation, status flips to `.groupStage` and lands on the group stage view (built in M23)
+
+New files (3):
+- `Features/Tournament/Bracket/BracketListView.swift`
+- `Features/Tournament/Bracket/CreateBracketSheet.swift`
+- `Features/Tournament/Bracket/BracketRow.swift` (list item)
+
+Edited files (1):
+- `Features/Tournament/TournamentDetailView.swift` — replace Tournaments tab placeholder with `BracketListView`
+
+Done when:
+- Host opens Tournaments tab → sees list (or empty state)
+- Tap `+` → fills in title, teams, groups, assignments → tap Start
+- New bracket appears in the list with status "Group Stage"
+- Tapping it opens placeholder for M23 view
+
+---
+
+### Milestone 23: Bracket Tournament — group round-robin phase 📋 PLANNED
+
+Goal:
+- Display group matches and live standings during the group-stage phase. Host enters scores per match; standings update live.
+
+Scope:
+- `GroupRoundRobinView` shown when bracket status is `.groupStage`
+- Tabs / segments per group (Group A, Group B, …)
+- Each group shows: round-robin matches (with score entry) + live standings table (Team / W / L / Pts)
+- "Configure Knockout" button appears when ALL group matches across ALL groups are completed
+- Tapping a match opens score entry sheet (single set, integer scores)
+
+Standings logic (computed):
+- W/L from completed matches
+- Points = wins (1 per win, 0 per loss). Tie-breaker: head-to-head → point differential → random
+- Sort: points desc → wins desc → diff desc → name
+
+New files (3):
+- `Features/Tournament/Bracket/GroupRoundRobinView.swift`
+- `Features/Tournament/Bracket/GroupStandingsTable.swift`
+- `Features/Tournament/Bracket/GroupMatchScoreSheet.swift`
+
+Edited files (1):
+- `Features/Tournament/Bracket/BracketDetailView.swift` (created in this milestone) — phase router (group → configure → knockout → finished)
+
+Done when:
+- Host opens an in-progress bracket → sees groups with their round-robin matches
+- Tapping any match → score entry → save → standings update live
+- "Configure Knockout" button appears once all matches done
+- Cancelling out + reopening preserves state (Firebase persistence)
+
+---
+
+### Milestone 24: Bracket Tournament — configure knockout phase 📋 PLANNED
+
+Goal:
+- After group stage completes, host configures: how many teams advance per group + best-of-N for knockout. System then randomly pairs advancing teams (with bye handling for odd counts).
+
+Scope:
+- `ConfigureKnockoutSheet`: per-group stepper for advance count (1...teamCount-1) + best-of segmented control (1 / 3 / 5 / 7)
+- On save: status flips to `.knockout`, system collects advancing teams, shuffles, pairs them, generates `KnockoutMatch` records with bye handling
+- Random pairing algorithm: shuffle → pair sequentially → odd team gets bye to next round
+
+New files (2):
+- `Features/Tournament/Bracket/ConfigureKnockoutSheet.swift`
+- `Domain/Services/KnockoutPairingEngine.swift` — pure pairing logic with bye assignment
+
+Edited files (1):
+- `BracketDetailView` — show "Configure Knockout" button + present sheet
+
+Done when:
+- Host inputs advance counts → tap Save → bracket transitions to knockout state
+- Random pairing visible (refresh shows same pairing — persisted)
+- Bye teams correctly skip first round
+- Best-of-N value persisted
+
+---
+
+### Milestone 25: Bracket Tournament — visual knockout bracket 📋 PLANNED
+
+Goal:
+- The signature visual bracket UI from the screenshot. QF → SF → Final layout with team cards, set scores, seed badges, BYE display, connecting lines, dates, 3rd place match, trophy on Final.
+
+Scope:
+- `KnockoutBracketView` — horizontally scrollable visual bracket
+- Each match rendered as `BracketMatchCard`: 2 rows (team name + small seed badge + bold score per set)
+- BYE state: vertical "BYE" panel on right of card
+- `BracketConnector` — SwiftUI `Path` drawing the lines between rounds
+- Round labels: "QF · Game N", "SF · Game N", "🏆 Final", "3rd place"
+- Tapping a match opens `KnockoutSetEntrySheet` — host enters set scores. Auto-detects match winner once enough sets are decided
+- 3rd place match auto-generated from SF losers
+- Champion display when Final completes
+
+New files (4):
+- `Features/Tournament/Bracket/KnockoutBracketView.swift`
+- `Features/Tournament/Bracket/BracketMatchCard.swift`
+- `Features/Tournament/Bracket/BracketConnector.swift`
+- `Features/Tournament/Bracket/KnockoutSetEntrySheet.swift`
+
+Edited files (1):
+- `BracketDetailView` — route knockout phase to `KnockoutBracketView`; show champion when finished
+
+Done when:
+- Visual bracket matches the reference screenshot layout (QF→SF→Final, 3rd place, trophy icon, seed badges, set scores, BYE)
+- Host can tap any match → enter set scores → match auto-completes when winner is decided
+- Bracket auto-progresses: SF winners populate Final, SF losers populate 3rd place
+- Final winner is shown as champion
+- Killing app preserves all state
 
 ---
 
