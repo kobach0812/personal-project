@@ -77,6 +77,106 @@ enum TournamentRotationEngine {
         return result
     }
 
+    // MARK: - Fixed-team round-robin
+
+    /// Fills all empty court slots with fixed-team round-robin matchups.
+    /// Picks the matchup played the fewest times (random tiebreak). No team can appear on two courts at once.
+    static func generateFixedTeamRound(session: TournamentSession) -> [TournamentMatch] {
+        let teams = session.fixedTeams
+        guard teams.count >= 2 else { return [] }
+
+        // Build all pair combos
+        var allMatchups: [(FixedTeam, FixedTeam)] = []
+        for i in 0 ..< teams.count {
+            for j in (i + 1) ..< teams.count {
+                allMatchups.append((teams[i], teams[j]))
+            }
+        }
+
+        // Count how many times each matchup has been played
+        let playCount = fixedTeamPlayCounts(allMatchups: allMatchups, completedMatches: session.completedMatches)
+
+        // Shuffle for random tiebreak, then stable-sort by play count
+        var shuffled = allMatchups.shuffled()
+        shuffled.sort { playCount[matchupKey($0.0, $0.1), default: 0] < playCount[matchupKey($1.0, $1.1), default: 0] }
+
+        // Assign to free courts
+        let occupiedCourts = Set(session.currentRound.map(\.court))
+        var freeCourts = (1 ... session.courts).filter { !occupiedCourts.contains($0) }
+        var busyTeamIDs = Set(session.currentRound.flatMap { $0.teamA + $0.teamB })
+        var result: [TournamentMatch] = []
+
+        for (t1, t2) in shuffled {
+            guard !freeCourts.isEmpty else { break }
+            let allIDs = Set(t1.playerIDs + t2.playerIDs)
+            guard allIDs.isDisjoint(with: busyTeamIDs) else { continue }
+            let court = freeCourts.removeFirst()
+            result.append(TournamentMatch(id: UUID().uuidString, court: court,
+                                          teamA: t1.playerIDs, teamB: t2.playerIDs,
+                                          winnerTeam: nil))
+            busyTeamIDs.formUnion(allIDs)
+        }
+        return result
+    }
+
+    /// Generates the best next fixed-team matchup for a single freed court. Returns nil if no valid matchup.
+    static func nextFixedTeamMatch(court: Int, session: TournamentSession) -> TournamentMatch? {
+        let teams = session.fixedTeams
+        guard teams.count >= 2 else { return nil }
+
+        var allMatchups: [(FixedTeam, FixedTeam)] = []
+        for i in 0 ..< teams.count {
+            for j in (i + 1) ..< teams.count {
+                allMatchups.append((teams[i], teams[j]))
+            }
+        }
+
+        let playCount = fixedTeamPlayCounts(allMatchups: allMatchups, completedMatches: session.completedMatches)
+        var shuffled = allMatchups.shuffled()
+        shuffled.sort { playCount[matchupKey($0.0, $0.1), default: 0] < playCount[matchupKey($1.0, $1.1), default: 0] }
+
+        let busyTeamIDs = Set(session.currentRound.flatMap { $0.teamA + $0.teamB })
+        for (t1, t2) in shuffled {
+            let allIDs = Set(t1.playerIDs + t2.playerIDs)
+            if allIDs.isDisjoint(with: busyTeamIDs) {
+                return TournamentMatch(id: UUID().uuidString, court: court,
+                                      teamA: t1.playerIDs, teamB: t2.playerIDs,
+                                      winnerTeam: nil)
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Fixed-team helpers
+
+    private static func matchupKey(_ t1: FixedTeam, _ t2: FixedTeam) -> String {
+        let ids = [Set(t1.playerIDs), Set(t2.playerIDs)]
+            .map { $0.sorted().joined(separator: ",") }
+            .sorted()
+        return ids.joined(separator: "|")
+    }
+
+    private static func fixedTeamPlayCounts(
+        allMatchups: [(FixedTeam, FixedTeam)],
+        completedMatches: [TournamentMatch]
+    ) -> [String: Int] {
+        // Build lookup: sorted player-ID set → FixedTeam
+        var teamByKey: [String: FixedTeam] = [:]
+        for (t1, t2) in allMatchups {
+            teamByKey[t1.playerIDs.sorted().joined(separator: ",")] = t1
+            teamByKey[t2.playerIDs.sorted().joined(separator: ",")] = t2
+        }
+
+        var counts: [String: Int] = [:]
+        for match in completedMatches {
+            let keyA = match.teamA.sorted().joined(separator: ",")
+            let keyB = match.teamB.sorted().joined(separator: ",")
+            guard let tA = teamByKey[keyA], let tB = teamByKey[keyB] else { continue }
+            counts[matchupKey(tA, tB), default: 0] += 1
+        }
+        return counts
+    }
+
     // MARK: - Private
 
     /// Priority order for picking who plays next:

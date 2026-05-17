@@ -2,6 +2,7 @@ import Foundation
 
 actor StubTournamentService: TournamentServicing {
     private var tournaments: [Tournament] = []
+    private var registrations: [String: [Registration]] = [:]   // sessionID → registrations
 
     // MARK: - Tournament lifecycle
 
@@ -53,7 +54,8 @@ actor StubTournamentService: TournamentServicing {
 
     // MARK: - Day / session lifecycle
 
-    func startDay(for tournament: Tournament, courts: Int, players: [TournamentPlayer]) async throws -> (Tournament, TournamentSession) {
+    func startDay(for tournament: Tournament, courts: Int, players: [TournamentPlayer],
+                  mode: SessionMode, fixedTeams: [FixedTeam]) async throws -> (Tournament, TournamentSession) {
         let existingSessions = tournaments.first(where: { $0.id == tournament.id })?.sessions ?? []
         var session = TournamentSession(
             id: UUID().uuidString,
@@ -70,9 +72,16 @@ actor StubTournamentService: TournamentServicing {
             matchCounter: 0,
             completedMatches: [],
             partnerships: [:],
-            participantUserIDs: players.compactMap(\.userID)
+            participantUserIDs: players.compactMap(\.userID),
+            endedAt: nil,
+            scheduledStart: nil,
+            location: nil,
+            mode: mode,
+            fixedTeams: fixedTeams
         )
-        session.currentRound = TournamentRotationEngine.fillAllCourts(session: session)
+        session.currentRound = mode == .fixedTeams
+            ? TournamentRotationEngine.generateFixedTeamRound(session: session)
+            : TournamentRotationEngine.fillAllCourts(session: session)
 
         var t = tournament
         t.activeDayID = session.id
@@ -113,7 +122,9 @@ actor StubTournamentService: TournamentServicing {
 
     func generateNextRound(for session: TournamentSession) async throws -> TournamentSession {
         var updated = session
-        updated.currentRound = TournamentRotationEngine.fillAllCourts(session: updated)
+        updated.currentRound = session.mode == .fixedTeams
+            ? TournamentRotationEngine.generateFixedTeamRound(session: updated)
+            : TournamentRotationEngine.fillAllCourts(session: updated)
         upsertSession(updated)
         return updated
     }
@@ -135,7 +146,10 @@ actor StubTournamentService: TournamentServicing {
         updated.completedMatches.insert(archived, at: 0)
 
         updated.currentRound.removeAll { $0.id == matchID }
-        if let next = TournamentRotationEngine.generateMatchForCourt(court: match.court, session: updated) {
+        let nextMatch = updated.mode == .fixedTeams
+            ? TournamentRotationEngine.nextFixedTeamMatch(court: match.court, session: updated)
+            : TournamentRotationEngine.generateMatchForCourt(court: match.court, session: updated)
+        if let next = nextMatch {
             updated.currentRound.append(next)
         }
         upsertSession(updated)
@@ -160,6 +174,109 @@ actor StubTournamentService: TournamentServicing {
         else { return session }
         players[idx].isActive = isActive
         return try await updatePlayers(players, for: session)
+    }
+
+    // MARK: - Fixed teams
+
+    func setFixedTeams(_ teams: [FixedTeam], for session: TournamentSession) async throws -> TournamentSession {
+        var updated = session
+        updated.mode = .fixedTeams
+        updated.fixedTeams = teams
+        upsertSession(updated)
+        return updated
+    }
+
+    // MARK: - Scheduled day lifecycle
+
+    func scheduleSession(for tournament: Tournament, title: String, scheduledStart: Date, courts: Int, location: String?) async throws -> TournamentSession {
+        let session = TournamentSession(
+            id: UUID().uuidString, tournamentID: tournament.id, squadID: tournament.squadID,
+            createdBy: tournament.createdBy, createdAt: .now, title: title,
+            status: .scheduled, courts: courts, players: [], currentRound: [],
+            roundNumber: 0, matchCounter: 0, completedMatches: [], partnerships: [:],
+            participantUserIDs: [], endedAt: nil, scheduledStart: scheduledStart, location: location,
+            mode: .rotation, fixedTeams: []
+        )
+        var t = tournament
+        t.sessions.append(session)
+        upsertTournament(t)
+        return session
+    }
+
+    func cancelScheduledSession(_ session: TournamentSession) async throws -> TournamentSession {
+        var updated = session
+        updated.status = .cancelled
+        upsertSession(updated)
+        return updated
+    }
+
+    func startScheduledSession(_ session: TournamentSession, courts: Int, players: [TournamentPlayer]) async throws -> TournamentSession {
+        var updated = session
+        updated.status = .active
+        updated.courts = courts
+        updated.players = players
+        updated.participantUserIDs = players.compactMap(\.userID)
+        updated.currentRound = TournamentRotationEngine.fillAllCourts(session: updated)
+        upsertSession(updated)
+        return updated
+    }
+
+    // MARK: - RSVP
+
+    func setRegistrationStatus(_ status: RegistrationStatus, userID: String, name: String, for session: TournamentSession) async throws {
+        var regs = registrations[session.id] ?? []
+        if let idx = regs.firstIndex(where: { $0.id == userID }) {
+            regs[idx].status = status
+        } else {
+            regs.append(Registration(id: userID, userID: userID, name: name, status: status,
+                                     registeredAt: .now, checkedInAt: nil, addedToRoster: false))
+        }
+        registrations[session.id] = regs
+    }
+
+    // MARK: - Check-in
+
+    func checkInPlayer(userID: String, name: String, in session: TournamentSession) async throws -> TournamentSession {
+        var regs = registrations[session.id] ?? []
+        if let idx = regs.firstIndex(where: { $0.id == userID }) {
+            regs[idx].checkedInAt = .now
+        } else {
+            regs.append(Registration(id: userID, userID: userID, name: name, status: .yes,
+                                     registeredAt: .now, checkedInAt: .now, addedToRoster: false))
+        }
+        registrations[session.id] = regs
+
+        // If session is active, immediately add to roster
+        if session.status == .active {
+            let newPlayer = TournamentPlayer(id: UUID().uuidString, name: name, userID: userID,
+                                             played: 0, wins: 0, losses: 0, lastPlayedAt: 0, isActive: true)
+            var updated = session
+            updated.players.append(newPlayer)
+            updated.participantUserIDs.append(userID)
+            if let idx = registrations[session.id]?.firstIndex(where: { $0.id == userID }) {
+                registrations[session.id]?[idx].addedToRoster = true
+            }
+            upsertSession(updated)
+            return updated
+        }
+        return session
+    }
+
+    nonisolated func observeRegistrations(for session: TournamentSession) -> AsyncStream<[Registration]> {
+        AsyncStream { continuation in continuation.finish() }
+    }
+
+    func fetchNextScheduledSession(squadID: String) async throws -> TournamentSession? {
+        let now = Date.now
+        let allSessions = tournaments
+            .filter { $0.squadID == squadID }
+            .flatMap { $0.sessions }
+        let upcoming = allSessions.filter { session in
+            session.status == .scheduled && (session.scheduledStart ?? .distantFuture) > now
+        }
+        return upcoming.sorted { a, b in
+            (a.scheduledStart ?? .distantFuture) < (b.scheduledStart ?? .distantFuture)
+        }.first
     }
 
     // MARK: - Private helpers

@@ -179,4 +179,22 @@ final class TournamentViewModel: ObservableObject {
         return session.currentRound.flatMap { $0.teamA + $0.teamB }.contains(player.id)
     }
 
+    // MARK: - Fixed teams
+
+    /// Returns the fixed-team name whose playerIDs match the given IDs (order-insensitive). Nil in rotation mode.
+    func fixedTeamName(for playerIDs: [String]) -> String? {
+        guard let session, session.mode == .fixedTeams else { return nil }
+        let set = Set(playerIDs)
+        return session.fixedTeams.first { Set($0.playerIDs) == set }?.name
+    }
+
+    func setFixedTeams(_ teams: [FixedTeam], tournamentService: TournamentServicing) async {
+        guard let session else { return }
+        do {
+            self.session = try await tournamentService.setFixedTeams(teams, for: session)
+        } catch {
+            errorMessage = "Could not save fixed teams."
+        }
+    }
+
 }

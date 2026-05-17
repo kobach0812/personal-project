@@ -1,8 +1,21 @@
 import Foundation
 
+enum SessionMode: String, Codable, Sendable {
+    case rotation   // fair-play rotation (default)
+    case fixedTeams // round-robin between pre-defined pairs
+}
+
+struct FixedTeam: Identifiable, Codable, Equatable, Hashable, Sendable {
+    let id: String
+    var name: String        // "Team 1", "Team 2" … (auto-assigned)
+    var playerIDs: [String] // exactly 2 for doubles
+}
+
 enum TournamentStatus: String, Codable, Sendable {
+    case scheduled
     case active
     case finished
+    case cancelled
 }
 
 enum WinnerTeam: String, Codable, Sendable {
@@ -82,4 +95,12 @@ struct TournamentSession: Identifiable, Codable, Hashable, Sendable {
     var participantUserIDs: [String]
     /// Set when the day is ended. Used to compute duration in the Summary tab.
     var endedAt: Date?
+    /// Nil for walk-up sessions. Set for pre-scheduled days.
+    var scheduledStart: Date?
+    /// Optional free-text location, e.g. "Court 3, Eastern Park".
+    var location: String?
+    /// Session scheduling mode — rotation (default) or fixed-teams round-robin.
+    var mode: SessionMode
+    /// Pre-defined fixed pairs. Non-empty only when mode == .fixedTeams.
+    var fixedTeams: [FixedTeam]
 }

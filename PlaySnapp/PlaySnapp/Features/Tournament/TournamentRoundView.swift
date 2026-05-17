@@ -3,16 +3,28 @@ import SwiftUI
 struct TournamentRoundView: View {
     @ObservedObject var vm: TournamentViewModel
     @EnvironmentObject private var env: AppEnvironment
+    @State private var showManageTeams = false
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 if let session = vm.session {
+                    // Fixed-teams mode badge
+                    if session.mode == .fixedTeams {
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.2.fill")
+                            Text("Fixed Teams · Round Robin")
+                        }
+                        .font(.caption.bold())
+                        .foregroundStyle(.blue)
+                        .padding(.vertical, 4)
+                    }
+
                     ForEach(session.currentRound.sorted { $0.court < $1.court }) { match in
                         MatchCard(match: match, vm: vm)
                     }
 
-                    if !vm.sittingOut.isEmpty || !vm.benched.isEmpty {
+                    if session.mode == .rotation && (!vm.sittingOut.isEmpty || !vm.benched.isEmpty) {
                         PlayerStatusCard(vm: vm)
                     }
 
@@ -31,6 +43,19 @@ struct TournamentRoundView: View {
                     }
 
                     if vm.isOrganizer && session.status == .active {
+                        // Manage Fixed Teams button
+                        Button {
+                            showManageTeams = true
+                        } label: {
+                            Label(
+                                session.mode == .fixedTeams ? "Edit Fixed Teams" : "Set Up Fixed Teams",
+                                systemImage: "person.2.badge.gearshape"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.horizontal)
+
                         Button("End Day") {
                             Task { await vm.endDay(tournamentService: env.tournamentService) }
                         }
@@ -40,6 +65,16 @@ struct TournamentRoundView: View {
                 }
             }
             .padding(.vertical)
+        }
+        .sheet(isPresented: $showManageTeams) {
+            if let session = vm.session {
+                FixedTeamSetupSheet(
+                    players: session.players,
+                    initialTeams: session.fixedTeams
+                ) { teams in
+                    Task { await vm.setFixedTeams(teams, tournamentService: env.tournamentService) }
+                }
+            }
         }
     }
 }
@@ -52,6 +87,9 @@ struct MatchCard: View {
     @EnvironmentObject private var env: AppEnvironment
     @State private var showResultSheet = false
 
+    private var teamALabel: String? { vm.fixedTeamName(for: match.teamA) }
+    private var teamBLabel: String? { vm.fixedTeamName(for: match.teamB) }
+
     var body: some View {
         VStack(spacing: 10) {
             Text("Court \(match.court)")
@@ -59,9 +97,9 @@ struct MatchCard: View {
                 .foregroundStyle(.secondary)
 
             HStack(alignment: .top, spacing: 0) {
-                teamColumn(ids: match.teamA, isWinner: match.winnerTeam == .teamA)
+                teamColumn(ids: match.teamA, teamName: teamALabel, isWinner: match.winnerTeam == .teamA)
                 Text("vs").foregroundStyle(.secondary).frame(width: 36)
-                teamColumn(ids: match.teamB, isWinner: match.winnerTeam == .teamB)
+                teamColumn(ids: match.teamB, teamName: teamBLabel, isWinner: match.winnerTeam == .teamB)
             }
 
             if vm.isOrganizer && match.winnerTeam == nil {
@@ -69,7 +107,10 @@ struct MatchCard: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
             } else if let winner = match.winnerTeam {
-                Label(winner == .teamA ? "Team A wins" : "Team B wins", systemImage: "checkmark.circle.fill")
+                let winLabel = winner == .teamA
+                    ? (teamALabel ?? "Team A")
+                    : (teamBLabel ?? "Team B")
+                Label("\(winLabel) wins", systemImage: "checkmark.circle.fill")
                     .font(.caption.bold())
                     .foregroundStyle(.green)
             }
@@ -85,8 +126,13 @@ struct MatchCard: View {
     }
 
     @ViewBuilder
-    private func teamColumn(ids: [String], isWinner: Bool) -> some View {
+    private func teamColumn(ids: [String], teamName: String?, isWinner: Bool) -> some View {
         VStack(spacing: 4) {
+            if let label = teamName {
+                Text(label)
+                    .font(isWinner ? .caption.bold() : .caption)
+                    .foregroundStyle(isWinner ? .primary : .secondary)
+            }
             ForEach(ids, id: \.self) { id in
                 Text(vm.playerName(id))
                     .font(isWinner ? .callout.bold() : .callout)
@@ -169,7 +215,9 @@ struct ResultEntrySheet: View {
 
     private func winnerButton(_ team: WinnerTeam) -> some View {
         let ids = team == .teamA ? match.teamA : match.teamB
-        let label = ids.map { vm.playerName($0) }.joined(separator: " & ")
+        let playerNames = ids.map { vm.playerName($0) }.joined(separator: " & ")
+        let teamName = vm.fixedTeamName(for: ids)
+        let label = teamName.map { "\($0) (\(playerNames))" } ?? playerNames
         return Button { selectedWinner = team } label: {
             HStack {
                 Text(label)

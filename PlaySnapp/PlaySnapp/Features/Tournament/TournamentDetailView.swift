@@ -15,6 +15,7 @@ struct TournamentDetailView: View {
     @State private var errorMessage: String?
     @State private var selectedTab = 0
     @State private var showStartDay = false
+    @State private var showScheduleDay = false
     @State private var showEndConfirm = false
     @State private var navigateToSession: TournamentSession?
 
@@ -33,6 +34,7 @@ struct TournamentDetailView: View {
             Picker("", selection: $selectedTab) {
                 Text("Board").tag(0)
                 Text("Days").tag(1)
+                Text("Tournaments").tag(2)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
@@ -42,7 +44,13 @@ struct TournamentDetailView: View {
 
             switch selectedTab {
             case 0:  TournamentBillboardView(players: tournament.players)
-            default: daysListView
+            case 1:  daysListView
+            default:
+                ContentUnavailableView(
+                    "No bracket tournaments yet",
+                    systemImage: "trophy",
+                    description: Text("Bracket tournaments coming soon.")
+                )
             }
         }
         .navigationTitle(tournament.title.isEmpty ? "Tournament" : tournament.title)
@@ -53,8 +61,11 @@ struct TournamentDetailView: View {
                     Menu {
                         if !hasActiveDay {
                             Button { showStartDay = true } label: {
-                                Label("Start New Day", systemImage: "calendar.badge.plus")
+                                Label("Start Walk-up Day", systemImage: "play.circle")
                             }
+                        }
+                        Button { showScheduleDay = true } label: {
+                            Label("Schedule Game Day", systemImage: "calendar.badge.plus")
                         }
                         Divider()
                         Button(role: .destructive) { showEndConfirm = true } label: {
@@ -67,12 +78,7 @@ struct TournamentDetailView: View {
             }
         }
         .navigationDestination(item: $navigateToSession) { session in
-            DayDetailView(
-                session: session,
-                tournament: tournament,
-                currentUser: currentUser,
-                onTournamentUpdated: { self.tournament = $0 }
-            )
+            sessionDestination(for: session)
         }
         .sheet(isPresented: $showStartDay) {
             StartDaySheet(
@@ -82,6 +88,11 @@ struct TournamentDetailView: View {
                 self.tournament = newTournament
                 self.sessions.append(newSession)
                 self.navigateToSession = newSession
+            }
+        }
+        .sheet(isPresented: $showScheduleDay) {
+            ScheduleGameDaySheet(tournament: tournament) { newSession in
+                sessions.append(newSession)
             }
         }
         .confirmationDialog("End Tournament?", isPresented: $showEndConfirm, titleVisibility: .visible) {
@@ -108,6 +119,33 @@ struct TournamentDetailView: View {
         }
     }
 
+    // MARK: - Session destination router
+
+    @ViewBuilder
+    private func sessionDestination(for session: TournamentSession) -> some View {
+        switch session.status {
+        case .scheduled, .cancelled:
+            ScheduledDayDetailView(
+                session: session,
+                currentUser: currentUser,
+                squadMemberIDs: squadMemberIDs
+            ) { activeSession in
+                // Replace the scheduled session with the now-active one
+                if let idx = sessions.firstIndex(where: { $0.id == activeSession.id }) {
+                    sessions[idx] = activeSession
+                }
+                navigateToSession = activeSession
+            }
+        case .active, .finished:
+            DayDetailView(
+                session: session,
+                tournament: tournament,
+                currentUser: currentUser,
+                onTournamentUpdated: { self.tournament = $0 }
+            )
+        }
+    }
+
     // MARK: - Days list
 
     @ViewBuilder
@@ -119,12 +157,18 @@ struct TournamentDetailView: View {
                 "No days yet",
                 systemImage: "calendar.badge.plus",
                 description: Text(isOrganizer
-                    ? "Tap ⋯ to start the first play day."
+                    ? "Tap ⋯ to start or schedule a play day."
                     : "No play days have been recorded yet.")
             )
         } else {
             List {
-                ForEach(sessions.sorted { $0.createdAt > $1.createdAt }) { session in
+                ForEach(sessions.sorted { lhs, rhs in
+                    // Scheduled future days first, then by date desc
+                    let lIsUpcoming = lhs.status == .scheduled
+                    let rIsUpcoming = rhs.status == .scheduled
+                    if lIsUpcoming != rIsUpcoming { return lIsUpcoming }
+                    return lhs.createdAt > rhs.createdAt
+                }) { session in
                     Button { navigateToSession = session } label: {
                         DayRow(session: session)
                     }
@@ -160,29 +204,61 @@ struct TournamentDetailView: View {
 private struct DayRow: View {
     let session: TournamentSession
 
+    private var statusLabel: String {
+        switch session.status {
+        case .scheduled:  return "Scheduled"
+        case .active:     return "In progress"
+        case .finished:   return "Finished"
+        case .cancelled:  return "Cancelled"
+        }
+    }
+
+    private var statusColor: Color {
+        switch session.status {
+        case .scheduled:  return .orange
+        case .active:     return .green
+        case .finished:   return .secondary
+        case .cancelled:  return .red
+        }
+    }
+
+    private var dateLabel: String {
+        if session.status == .scheduled, let start = session.scheduledStart {
+            return start.formatted(date: .abbreviated, time: .shortened)
+        }
+        return session.createdAt.formatted(date: .abbreviated, time: .shortened)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(session.status == .active ? Color.green : Color.secondary)
+                .fill(statusColor)
                 .frame(width: 8, height: 8)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.title.isEmpty ? "Day" : session.title)
                     .font(.body)
-                Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
+                Text(dateLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if let loc = session.location {
+                    Text(loc)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(session.status == .active ? "In progress" : "Finished")
+                Text(statusLabel)
                     .font(.caption.bold())
-                    .foregroundStyle(session.status == .active ? .green : .secondary)
-                Text("\(session.players.count) players")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(statusColor)
+                if session.status != .scheduled {
+                    Text("\(session.players.count) players")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.vertical, 2)
@@ -250,6 +326,9 @@ struct StartDaySheet: View {
     var onStarted: (Tournament, TournamentSession) -> Void
 
     @State private var courts = 1
+    @State private var sessionMode: SessionMode = .rotation
+    @State private var draftFixedTeams: [FixedTeam] = []
+    @State private var showTeamSetup = false
     /// Mutable local copy of the tournament roster — guest names can be edited inline.
     @State private var rosterPlayers: [TournamentPlayer]
     /// Players added this session via PlayerPickerSheet (not yet on the tournament roster).
@@ -277,13 +356,60 @@ struct StartDaySheet: View {
         allPlayers.filter { selectedPlayerIDs.contains($0.id) }
     }
 
-    private var canStart: Bool { selectedPlayers.count >= courts * 4 }
+    private var canStart: Bool {
+        if sessionMode == .fixedTeams {
+            return draftFixedTeams.count >= 2 && draftFixedTeams.allSatisfy { $0.playerIDs.count == 2 }
+        }
+        return selectedPlayers.count >= courts * 4
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Courts") {
                     Stepper("Courts: \(courts)", value: $courts, in: 1...4)
+                }
+
+                Section("Session Mode") {
+                    Picker("Mode", selection: $sessionMode) {
+                        Text("Rotation").tag(SessionMode.rotation)
+                        Text("Fixed Teams").tag(SessionMode.fixedTeams)
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: sessionMode) { _, _ in
+                        // Clear draft teams when switching back to rotation
+                        if sessionMode == .rotation { draftFixedTeams = [] }
+                    }
+
+                    if sessionMode == .fixedTeams {
+                        Button {
+                            showTeamSetup = true
+                        } label: {
+                            HStack {
+                                Label(draftFixedTeams.isEmpty ? "Set Up Teams" : "Edit Teams",
+                                      systemImage: "person.2.badge.gearshape")
+                                Spacer()
+                                if !draftFixedTeams.isEmpty {
+                                    Text("\(draftFixedTeams.count) teams")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
+                        // Summary of configured teams
+                        ForEach(draftFixedTeams) { team in
+                            let names = team.playerIDs
+                                .compactMap { id in allPlayers.first { $0.id == id }?.name }
+                                .joined(separator: " & ")
+                            HStack {
+                                Text(team.name).font(.callout.bold())
+                                Text(names).font(.callout).foregroundStyle(.secondary)
+                                Spacer()
+                                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                            }
+                        }
+                    }
                 }
 
                 Section {
@@ -316,8 +442,13 @@ struct StartDaySheet: View {
                     Text("Today's Players (\(selectedPlayers.count))")
                 } footer: {
                     if !canStart {
-                        Text("Need at least \(courts * 4) players for \(courts) court(s).")
-                            .foregroundStyle(.red)
+                        if sessionMode == .fixedTeams {
+                            Text("Set up at least 2 complete teams to start.")
+                                .foregroundStyle(.red)
+                        } else {
+                            Text("Need at least \(courts * 4) players for \(courts) court(s).")
+                                .foregroundStyle(.red)
+                        }
                     }
                 }
 
@@ -337,6 +468,14 @@ struct StartDaySheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showTeamSetup) {
+                FixedTeamSetupSheet(
+                    players: selectedPlayers,
+                    initialTeams: draftFixedTeams
+                ) { teams in
+                    draftFixedTeams = teams
                 }
             }
             .sheet(isPresented: $showPicker) {
@@ -385,7 +524,8 @@ struct StartDaySheet: View {
                 finalRoster, for: tournament
             )
             let (newTournament, session) = try await env.tournamentService.startDay(
-                for: updatedTournament, courts: courts, players: dayPlayers
+                for: updatedTournament, courts: courts, players: dayPlayers,
+                mode: sessionMode, fixedTeams: draftFixedTeams
             )
             dismiss()
             onStarted(newTournament, session)
@@ -397,7 +537,7 @@ struct StartDaySheet: View {
 
 // MARK: - Player toggle row (used in StartDaySheet)
 
-private struct PlayerToggleRow: View {
+struct PlayerToggleRow: View {
     @Binding var player: TournamentPlayer
     let isSelected: Bool
     let onToggle: (Bool) -> Void

@@ -6,6 +6,7 @@ final class FeedViewModel: ObservableObject {
     @Published var plays: [Play] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var nextScheduledSession: TournamentSession?
 
     func load(playService: PlayServicing) async {
         isLoading = true
@@ -35,5 +36,9 @@ final class FeedViewModel: ObservableObject {
         } catch {
             errorMessage = "Reaction failed."
         }
+    }
+
+    func loadNextScheduledSession(squadID: String, tournamentService: TournamentServicing) async {
+        nextScheduledSession = try? await tournamentService.fetchNextScheduledSession(squadID: squadID)
     }
 }

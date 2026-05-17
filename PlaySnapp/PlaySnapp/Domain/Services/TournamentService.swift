@@ -26,7 +26,8 @@ protocol TournamentServicing: Sendable {
     // MARK: - Day / session lifecycle
 
     /// Creates a new active day session within the tournament.
-    func startDay(for tournament: Tournament, courts: Int, players: [TournamentPlayer]) async throws -> (Tournament, TournamentSession)
+    func startDay(for tournament: Tournament, courts: Int, players: [TournamentPlayer],
+                  mode: SessionMode, fixedTeams: [FixedTeam]) async throws -> (Tournament, TournamentSession)
     /// Ends the day: marks session finished, merges day stats into tournament cumulative stats.
     func endDay(_ session: TournamentSession, for tournament: Tournament) async throws -> Tournament
     func fetchSessions(for tournament: Tournament) async throws -> [TournamentSession]
@@ -47,4 +48,36 @@ protocol TournamentServicing: Sendable {
 
     /// Participant toggles their own isActive flag. VM enforces caller only touches their own row.
     func setSelfBench(playerID: String, isActive: Bool, for session: TournamentSession) async throws -> TournamentSession
+
+    // MARK: - Fixed teams
+
+    /// Sets (or replaces) the fixed teams for a session and switches mode to .fixedTeams.
+    /// Current round is not modified — new engine applies from the next freed court.
+    func setFixedTeams(_ teams: [FixedTeam], for session: TournamentSession) async throws -> TournamentSession
+
+    // MARK: - Scheduled day lifecycle
+
+    /// Creates a session in `scheduled` status — no roster yet.
+    func scheduleSession(for tournament: Tournament, title: String, scheduledStart: Date, courts: Int, location: String?) async throws -> TournamentSession
+
+    /// Host cancels a scheduled day before it starts.
+    func cancelScheduledSession(_ session: TournamentSession) async throws -> TournamentSession
+
+    /// Host transitions scheduled → active with the confirmed courts count and player list.
+    func startScheduledSession(_ session: TournamentSession, courts: Int, players: [TournamentPlayer]) async throws -> TournamentSession
+
+    // MARK: - RSVP (participant self-action)
+
+    func setRegistrationStatus(_ status: RegistrationStatus, userID: String, name: String, for session: TournamentSession) async throws
+
+    // MARK: - Check-in (host only)
+
+    /// Stamps checkedInAt. If session is active, also appends player to session.players[].
+    func checkInPlayer(userID: String, name: String, in session: TournamentSession) async throws -> TournamentSession
+
+    func observeRegistrations(for session: TournamentSession) -> AsyncStream<[Registration]>
+
+    // MARK: - Next scheduled session (for Feed banner)
+
+    func fetchNextScheduledSession(squadID: String) async throws -> TournamentSession?
 }

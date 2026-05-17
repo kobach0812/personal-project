@@ -51,7 +51,7 @@ struct TournamentListView: View {
 
     var body: some View {
         listContent
-            .navigationTitle("Tournaments")
+            .navigationTitle("Game")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
