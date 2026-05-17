@@ -17,6 +17,7 @@ final class AppEnvironment: ObservableObject {
     let notificationService: NotificationServicing
     let widgetSyncService: WidgetSyncServicing
     let tournamentService: TournamentServicing
+    let bracketTournamentService: BracketTournamentServicing
     let friendService: FriendServicing
 
     init(
@@ -29,6 +30,7 @@ final class AppEnvironment: ObservableObject {
         notificationService: NotificationServicing,
         widgetSyncService: WidgetSyncServicing,
         tournamentService: TournamentServicing,
+        bracketTournamentService: BracketTournamentServicing,
         friendService: FriendServicing
     ) {
         self.authService = authService
@@ -40,6 +42,7 @@ final class AppEnvironment: ObservableObject {
         self.notificationService = notificationService
         self.widgetSyncService = widgetSyncService
         self.tournamentService = tournamentService
+        self.bracketTournamentService = bracketTournamentService
         self.friendService = friendService
     }
 }
@@ -69,6 +72,7 @@ extension AppEnvironment {
             notificationService: StubNotificationService(),
             widgetSyncService: LocalWidgetSyncService(),
             tournamentService: StubTournamentService(),
+            bracketTournamentService: StubBracketTournamentService(),
             friendService: StubFriendService(sessionStore: sessionStore)
         )
     }
@@ -96,6 +100,7 @@ extension AppEnvironment {
             notificationService: StubNotificationService(),
             widgetSyncService: LocalWidgetSyncService(),
             tournamentService: FirebaseTournamentService(),
+            bracketTournamentService: FirebaseBracketTournamentService(),
             friendService: FirebaseFriendService(authGateway: authGateway)
         )
     }
