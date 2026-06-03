@@ -1,6 +1,6 @@
 import Foundation
 
-enum BracketTournamentServiceError: Error {
+enum BracketTournamentServiceError: Error, Equatable {
     case bracketNotFound
     case unsupportedTeamCount
     case knockoutNotConfigured

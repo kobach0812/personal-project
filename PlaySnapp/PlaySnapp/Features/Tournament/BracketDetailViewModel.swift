@@ -33,6 +33,12 @@ final class BracketDetailViewModel: ObservableObject {
         return BracketEngine.groupStageComplete(bracket)
     }
 
+    /// True once the knockout phase has been generated (status advanced past the group stage).
+    var knockoutConfigured: Bool {
+        guard let bracket else { return false }
+        return bracket.status == .knockout || bracket.status == .finished
+    }
+
     /// Recomputed on every call — standings calc is cheap and the bracket changes only via observer.
     func groupStandings(for group: BracketGroup) -> [FixedTeam] {
         let order = BracketEngine.standings(for: group)
@@ -119,6 +125,24 @@ final class BracketDetailViewModel: ObservableObject {
             // Live state will arrive via observeBracket; no local mutation needed.
         } catch {
             errorMessage = "Could not save score."
+        }
+    }
+
+    func configureKnockout(advanceCounts: [String: Int], bestOf: Int) async {
+        guard let bracket, let service = bracketService else { return }
+        do {
+            _ = try await service.configureKnockout(
+                bracketID: bracket.id,
+                advanceCounts: advanceCounts,
+                bestOf: bestOf,
+                squadID: bracket.squadID,
+                tournamentID: bracket.parentTournamentID
+            )
+            // Live state will arrive via observeBracket; no local mutation needed.
+        } catch BracketTournamentServiceError.unsupportedTeamCount {
+            errorMessage = "The number of advancing teams must be between 2 and 8."
+        } catch {
+            errorMessage = "Could not configure the knockout stage."
         }
     }
 }

@@ -7,6 +7,7 @@ struct BracketDetailView: View {
     @EnvironmentObject private var env: AppEnvironment
     @StateObject private var vm = BracketDetailViewModel()
     @State private var scoreEntry: ScoreEntryContext?
+    @State private var showConfigureKnockout = false
 
     var body: some View {
         List {
@@ -46,6 +47,13 @@ struct BracketDetailView: View {
                 ) }
             }
         }
+        .sheet(isPresented: $showConfigureKnockout) {
+            if let live = vm.bracket {
+                ConfigureKnockoutSheet(groups: live.groups) { advanceCounts, bestOf in
+                    Task { await vm.configureKnockout(advanceCounts: advanceCounts, bestOf: bestOf) }
+                }
+            }
+        }
         .alert("Error", isPresented: Binding(
             get: { vm.errorMessage != nil },
             set: { if !$0 { vm.errorMessage = nil } }
@@ -77,23 +85,27 @@ struct BracketDetailView: View {
 
     @ViewBuilder
     private var footerSection: some View {
-        if vm.groupStageComplete, vm.isOrganizer {
+        if vm.knockoutConfigured {
             Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Button {
-                        // intentionally disabled — M24 unlocks the real flow.
-                    } label: {
-                        HStack {
-                            Text("Configure Knockout")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                        }
+                Label("Knockout bracket generated", systemImage: "trophy.fill")
+                    .foregroundStyle(.secondary)
+            } footer: {
+                Text("Knockout matches and the visual bracket arrive in M25.")
+            }
+        } else if vm.groupStageComplete, vm.isOrganizer {
+            Section {
+                Button {
+                    showConfigureKnockout = true
+                } label: {
+                    HStack {
+                        Text("Configure Knockout")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
                     }
-                    .disabled(true)
-                    Text("Coming in M24.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
+            } footer: {
+                Text("Pick how many teams advance from each group, then generate the knockout bracket.")
             }
         }
     }
