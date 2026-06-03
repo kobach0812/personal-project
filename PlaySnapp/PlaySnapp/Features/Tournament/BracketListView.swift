@@ -36,7 +36,7 @@ struct BracketListView: View {
                 }
             }
             .navigationDestination(item: $navigateTo) { bracket in
-                BracketDetailPlaceholderView(bracket: bracket)
+                BracketDetailView(bracket: bracket, currentUser: currentUser)
             }
             .task { await load() }
             .alert("Error", isPresented: Binding(
@@ -87,32 +87,3 @@ struct BracketListView: View {
     }
 }
 
-// MARK: - Placeholder detail (M23 will replace)
-
-private struct BracketDetailPlaceholderView: View {
-    let bracket: BracketTournament
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "trophy")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
-            Text(bracket.title)
-                .font(.title2.bold())
-            Text("Group stage UI coming in M23")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(bracket.groups.count) group\(bracket.groups.count == 1 ? "" : "s")")
-                Text("\(bracket.groups.reduce(0) { $0 + $1.teams.count }) teams")
-                Text("\(bracket.groups.reduce(0) { $0 + $1.matches.count }) group matches scheduled")
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .padding(.top, 8)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle(bracket.title.isEmpty ? "Bracket" : bracket.title)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
