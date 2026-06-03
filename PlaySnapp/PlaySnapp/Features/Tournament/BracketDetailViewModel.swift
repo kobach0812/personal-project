@@ -128,6 +128,75 @@ final class BracketDetailViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Knockout reads
+
+    var knockoutBestOf: Int { bracket?.knockoutBestOf ?? 0 }
+
+    /// Sets a team must win to take a knockout match in the configured best-of-N.
+    var setsToWin: Int { BracketEngine.setsToWin(bestOf: max(1, knockoutBestOf)) }
+
+    /// Knockout matches in a round, ordered by bracket position.
+    func knockoutMatches(in round: KnockoutRound) -> [KnockoutMatch] {
+        (bracket?.knockoutMatches ?? [])
+            .filter { $0.round == round }
+            .sorted { $0.position < $1.position }
+    }
+
+    /// Looks up a team's display name anywhere in the bracket's groups.
+    func teamName(_ id: String?) -> String {
+        guard let id else { return "—" }
+        for group in bracket?.groups ?? [] {
+            if let team = group.teams.first(where: { $0.id == id }) { return team.name }
+        }
+        return id
+    }
+
+    /// Seed label = group letter + standing rank, e.g. "A1" for the top team of group A.
+    func seedLabel(for id: String?) -> String? {
+        guard let id else { return nil }
+        return seedLabels[id]
+    }
+
+    private var seedLabels: [String: String] {
+        var map: [String: String] = [:]
+        for group in bracket?.groups ?? [] {
+            for (index, teamID) in BracketEngine.standings(for: group).enumerated() {
+                map[teamID] = "\(group.name)\(index + 1)"
+            }
+        }
+        return map
+    }
+
+    /// The final winner, present only once the bracket is finished.
+    var champion: FixedTeam? {
+        guard let bracket, bracket.status == .finished,
+              let finalMatch = bracket.knockoutMatches.first(where: { $0.round == .final }),
+              let winnerID = finalMatch.winnerTeamID
+        else { return nil }
+        for group in bracket.groups {
+            if let team = group.teams.first(where: { $0.id == winnerID }) { return team }
+        }
+        return nil
+    }
+
+    // MARK: - Knockout writes
+
+    func recordKnockoutSet(matchID: String, set: SetScore) async {
+        guard let bracket, let service = bracketService else { return }
+        do {
+            _ = try await service.recordKnockoutSet(
+                bracketID: bracket.id,
+                matchID: matchID,
+                set: set,
+                squadID: bracket.squadID,
+                tournamentID: bracket.parentTournamentID
+            )
+            // Live state will arrive via observeBracket; no local mutation needed.
+        } catch {
+            errorMessage = "Could not save the set."
+        }
+    }
+
     func configureKnockout(advanceCounts: [String: Int], bestOf: Int) async {
         guard let bracket, let service = bracketService else { return }
         do {

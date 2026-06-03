@@ -105,4 +105,71 @@ struct ConfigureKnockoutServiceTests {
             )
         }
     }
+
+    // MARK: - Playing the knockout
+
+    /// Helper: configures a 4-team (2 groups × 2) knockout at the given best-of.
+    private func configuredFourTeamSemis(bestOf: Int) async throws
+        -> (StubBracketTournamentService, BracketTournament) {
+        let groups = [group("A", teamCount: 2), group("B", teamCount: 2)]
+        let (service, bracket) = try await makeBracket(groups: groups)
+        _ = try await service.configureKnockout(
+            bracketID: bracket.id,
+            advanceCounts: [groups[0].id: 2, groups[1].id: 2],
+            bestOf: bestOf,
+            squadID: "sq1", tournamentID: "t1"
+        )
+        return (service, bracket)
+    }
+
+    @Test("a best-of-3 match is decided only after a team wins 2 sets")
+    func recordKnockoutSet_bestOfThree_requiresTwoSetWins() async throws {
+        let (service, bracket) = try await configuredFourTeamSemis(bestOf: 3)
+        let configured = try await service.fetchBrackets(in: "t1", squadID: "sq1").first { $0.id == bracket.id }
+        let sf = try #require(configured?.knockoutMatches.first { $0.round == .semifinal })
+
+        var live = try await service.recordKnockoutSet(
+            bracketID: bracket.id, matchID: sf.id,
+            set: SetScore(teamAScore: 21, teamBScore: 18),
+            squadID: "sq1", tournamentID: "t1"
+        )
+        #expect(live.knockoutMatches.first { $0.id == sf.id }?.winnerTeamID == nil)
+
+        live = try await service.recordKnockoutSet(
+            bracketID: bracket.id, matchID: sf.id,
+            set: SetScore(teamAScore: 21, teamBScore: 12),
+            squadID: "sq1", tournamentID: "t1"
+        )
+        let decided = try #require(live.knockoutMatches.first { $0.id == sf.id })
+        #expect(decided.winnerTeamID == decided.teamAID)
+    }
+
+    @Test("playing through a 4-team knockout yields a final, a 3rd-place match, and a champion")
+    func recordKnockoutSet_completesBracketAndCrownsChampion() async throws {
+        let (service, bracket) = try await configuredFourTeamSemis(bestOf: 1)
+        var live = try #require(
+            await service.fetchBrackets(in: "t1", squadID: "sq1").first { $0.id == bracket.id }
+        )
+
+        for sf in live.knockoutMatches.filter({ $0.round == .semifinal }) {
+            live = try await service.recordKnockoutSet(
+                bracketID: bracket.id, matchID: sf.id,
+                set: SetScore(teamAScore: 21, teamBScore: 10),
+                squadID: "sq1", tournamentID: "t1"
+            )
+        }
+
+        #expect(live.knockoutMatches.contains { $0.round == .final })
+        #expect(live.knockoutMatches.contains { $0.round == .thirdPlace })
+
+        let finalMatch = try #require(live.knockoutMatches.first { $0.round == .final })
+        live = try await service.recordKnockoutSet(
+            bracketID: bracket.id, matchID: finalMatch.id,
+            set: SetScore(teamAScore: 21, teamBScore: 15),
+            squadID: "sq1", tournamentID: "t1"
+        )
+
+        #expect(live.status == .finished)
+        #expect(live.knockoutMatches.first { $0.round == .final }?.winnerTeamID != nil)
+    }
 }
