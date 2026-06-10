@@ -50,4 +50,4 @@ google-services.json
 .claude/
 .codegraph/
 .understand-anything/
-session-*.md
+/session-*.md

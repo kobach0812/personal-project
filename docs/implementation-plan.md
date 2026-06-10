@@ -1862,3 +1862,26 @@ After the implementation plan, the next useful move is to start the actual codeb
 - create app target files
 - set up Firebase initialization
 - build the app router
+
+---
+
+## 11. Changelog — Tournament→Game rename + game-level player management (2026-06-10)
+
+> The 132 "tournament" references above are historical and left as written. As of this change,
+> the top-level entity is a **Game**; "Tournament" now refers only to the bracket sub-tab.
+
+**Rename (code + UI + Firestore):**
+- `Tournament`→`Game`, `TournamentSession`→`GameSession`, `TournamentPlayer`→`GamePlayer`, `TournamentMatch`→`GameMatch`, `TournamentStatus`→`GameStatus`.
+- Services: `TournamentService(Servicing)`→`GameService(Servicing)`, `Firebase/StubTournamentService`→`Firebase/StubGameService`, `TournamentRotationEngine`→`GameRotationEngine`.
+- Views: `TournamentView`→`GameView`, `TournamentDetailView`→`GameDetailView`, `TournamentViewModel`→`GameViewModel`, plus `RoundView`/`BillboardView`/`SummaryView`/`HistoryView`.
+- Firestore: collection `tournaments`→`games`, field `tournamentID`→`gameID`, path helpers `FirestorePaths.game(s)`/`gameSession(s)`.
+- **Preserved** (bracket sub-feature): `BracketTournament*` types, `parentTournamentID`, the bracket service's `tournamentID` params, the "Tournaments" tab label, and `Features/Tournament/` folder name.
+
+**Player management:**
+- ⋯ menu reduced to **Add Players** + **End Game**; day creation (Walk-up / Schedule) moved to buttons on the Days tab.
+- Add Players persists to `game.players` via the existing Squad/Friends/Guest picker; in-session adding removed from the walk-up + scheduled-day sheets.
+- `removePlayer(playerID:from:)` added (protocol + Firebase + Stub); organizer removes a player from the Board tab. Mid-session days keep their own player copy.
+
+**Knockout UI:** redesigned as a horizontal single-elimination tree (connector lines, seeded nodes, "Winner of <round>" placeholders for ungenerated matches).
+
+Committed on branch `feature/game-rename-player-mgmt`. Build green; full test suite passes.

@@ -32,14 +32,14 @@ Listing only milestones with non-trivial test surface. **🔴 High = first pass.
 | M4 | Feed | Low | T2: `FeedViewModel` loading/error/empty states. |
 | M5 | Reactions | Med | T1: reaction summary aggregation. T2: optimistic toggle. T3: dedup (one user → one reaction). |
 | M7 | Widget | Med | T1: `WidgetThumbnailRenderer` 600px downsize. T1: `AppGroupStore` round-trip. T4: home screen install + post. |
-| **M10** | **Rotation tournament** | **🔴 Highest** | T1: `TournamentRotationEngine` — historically buggy. Cases: 4p/1c no repeats, 5p/1c fair rest, 7p/2c, 8p/2c no concurrent partner repeats, 11p/2c, `applyResult` updates `lastPlayedAt`, partnership counter, benched player excluded, never-played priority. |
+| **M10** | **Rotation game** | **🔴 Highest** | T1: `GameRotationEngine` — historically buggy. Cases: 4p/1c no repeats, 5p/1c fair rest, 7p/2c, 8p/2c no concurrent partner repeats, 11p/2c, `applyResult` updates `lastPlayedAt`, partnership counter, benched player excluded, never-played priority. |
 | M11 | Friends | Med | T1: `friendRequestID = from_to` determinism. T3: stub accept writes both directions. |
 | M12 | Multi-squad | Med | T1: legacy `squadID` → `squadIDs[]` migration fallback. T2: active squad switcher. |
-| M13 | Multi-session Game | Med | T1: `participantUserIDs` derivation. T2: `TournamentViewModel.role` (organizer / participant / spectator). |
+| M13 | Multi-session Game | Med | T1: `participantUserIDs` derivation. T2: `GameViewModel.role` (organizer / participant / spectator). |
 | M14 | Invite link / QR | Med | T1: `playsnapp://join?code=XXX` URL parsing. T2: `AppRouter.handleInviteURL` per auth state. T4: Messages link cross-device. |
 | M17 | Self-bench | Med | T1: bench state respected by rotation engine (extends M10). T4: 2-device bench → next match. |
 | M18 | Scheduled days | Med | T1: `fetchNextScheduledSession` filter. T3: stub check-in mid-session adds to `players[]`. T4: 3-device host + RSVP + late check-in. |
-| M20 | Fixed teams | Med | T1: `TournamentRotationEngine.generateFixedTeamRound`, `nextFixedTeamMatch`, `fixedTeamPlayCounts` (round-robin fairness). T2: mid-session mode switch doesn't interrupt current round. |
+| M20 | Fixed teams | Med | T1: `GameRotationEngine.generateFixedTeamRound`, `nextFixedTeamMatch`, `fixedTeamPlayCounts` (round-robin fairness). T2: mid-session mode switch doesn't interrupt current round. |
 | **M21** | **Bracket backend** | **🔴 Highest** | T1: `BracketEngine` full coverage. `generateGroupMatches` count, `standings` sort, `startingRound` mapping, `pairInitialMatches` even + odd, `applySet` for best-of-1/3/5, `advanceBracketIfReady` for QF→SF→F+3rd→finished, 4-team & 2-team starting states. |
 | M22 | Bracket setup UI | Low | T2: `CreateBracketSheet` validation (each group ≥ 2 teams). |
 
@@ -56,7 +56,7 @@ Milestones **not testable / skipped**: M0 (project setup), M1 (auth — covered 
 **Order:**
 
 1. ✅ Test target — already exists (`PlaySnappTests`)
-2. `TournamentRotationEngineTests.swift` — M10 + M17 + M20 coverage in one file (same engine)
+2. `GameRotationEngineTests.swift` — M10 + M17 + M20 coverage in one file (same engine)
 3. `BracketEngineTests.swift` — M21 coverage
 4. Once those land, expand to view models and Tier 3 stub contracts as time allows
 
@@ -66,7 +66,7 @@ Centralize player / session / team builders in a `TestFixtures.swift` next to `T
 
 ## 6. Engine coverage details
 
-### TournamentRotationEngine (M10 / M17 / M20)
+### GameRotationEngine (M10 / M17 / M20)
 
 | # | Test | Asserts |
 |---|---|---|
@@ -113,3 +113,10 @@ Centralize player / session / team builders in a `TestFixtures.swift` next to `T
 - Snapshot tests of SwiftUI views
 - Tests for the Firebase service implementations themselves
 - CI configuration (set up later when shipping to TestFlight is unblocked)
+
+## 5. Post-M25 changes (Tournament→Game rename + player management)
+
+- **Naming:** the top-level entity is now **Game** (`GameModels`, `GameService`, `GameRotationEngine`, `GameViewModel`, `GameDetailView`, Firestore collection `games/`). The bracket sub-tab keeps "Tournament" (`BracketTournament*`).
+- **New service method:** `removePlayer(playerID:from:)` on `GameServicing` (Firebase + Stub) — T3: stub removes from `game.players`, mid-session day copy untouched.
+- **Player management moved to the Game level** (⋯ Add Players / Remove from Game); day sheets now only select from the existing roster. T2: `GameViewModel`/day-start selection no longer mutates the roster.
+- **`BracketKnockoutSnapshotTests.swift`** renders the horizontal knockout tree (finished / live / start-with-placeholder states) to PNGs for visual eyeballing — render-only, not assertions.

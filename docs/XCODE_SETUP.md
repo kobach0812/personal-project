@@ -117,7 +117,7 @@ All Milestone 1–5, 7, 9–13 setup steps are complete. The app runs end-to-end
 | `FirebasePlayService` implemented | ✅ Done (M4) |
 | `FirebaseStorageService.uploadPhoto` implemented | ✅ Done (M3) |
 | `FirebaseFriendService` implemented | ✅ Done (M11) |
-| `FirebaseTournamentService` implemented | ✅ Done (M10/M13) |
+| `FirebaseGameService` implemented | ✅ Done (M10/M13) |
 
 ## 10. Remaining setup gaps
 

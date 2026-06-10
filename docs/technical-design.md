@@ -82,7 +82,7 @@ PlaySnap/
 │   │   ├── DeviceRegistration.swift
 │   │   ├── AppNotification.swift
 │   │   ├── FriendModels.swift            ← M11: Friend, FriendRequest
-│   │   └── TournamentModels.swift        ← M10/M13: session, match, player models
+│   │   └── GameModels.swift              ← M10/M13: Game, session, match, player models (renamed from TournamentModels)
 │   └── Services/
 │       ├── AuthService.swift
 │       ├── OnboardingProgressService.swift
@@ -93,7 +93,7 @@ PlaySnap/
 │       ├── NotificationService.swift
 │       ├── WidgetSyncService.swift
 │       ├── FriendService.swift           ← M11
-│       └── TournamentService.swift       ← M10/M13
+│       └── GameService.swift             ← M10/M13 (renamed from TournamentService)
 ├── Data/
 │   ├── Firebase/
 │   │   ├── FirebaseConfiguration.swift
@@ -110,7 +110,7 @@ PlaySnap/
 │   │   ├── FirebaseSquadService.swift    ← M2 ✅
 │   │   ├── FirebasePlayService.swift     ← M4 ✅
 │   │   ├── FirebaseFriendService.swift   ← M11 ✅
-│   │   └── FirebaseTournamentService.swift ← M10/M13 ✅
+│   │   └── FirebaseGameService.swift     ← M10/M13 ✅ (renamed from FirebaseTournamentService)
 │   ├── Local/
 │   │   ├── LocalWidgetSyncService.swift
 │   │   └── LocalOnboardingFlagStore.swift
@@ -124,7 +124,7 @@ PlaySnap/
 │       ├── StubStorageService.swift
 │       ├── StubNotificationService.swift
 │       ├── StubFriendService.swift       ← M11
-│       └── StubTournamentService.swift   ← M10/M13
+│       └── StubGameService.swift         ← M10/M13 (renamed from StubTournamentService)
 ├── Features/
 │   ├── Auth/
 │   │   ├── AuthView.swift
@@ -155,12 +155,14 @@ PlaySnap/
 │   ├── Profile/
 │   │   ├── ProfileView.swift
 │   │   └── ProfileViewModel.swift
-│   └── Tournament/
-│       ├── TournamentView.swift          ← M10/M13: Game tab root
-│       ├── TournamentViewModel.swift
-│       ├── TournamentDetailView.swift    ← M13: session list + day detail
-│       ├── TournamentSummaryView.swift   ← M13: finished day summary
-│       └── PlayerPickerSheet.swift       ← M13: squad/friends/guest roster picker
+│   └── Tournament/                       ← folder name kept; houses Game screens + the Bracket "Tournaments" sub-tab
+│       ├── GameView.swift                ← M10/M13: Game tab root (was TournamentView)
+│       ├── GameViewModel.swift
+│       ├── GameDetailView.swift          ← M13: Board / Days / Tournaments tabs + ⋯ menu (Add Players / End Game)
+│       ├── GameBillboardView.swift       ← Board tab; organizer long-press → Remove from Game
+│       ├── GameSummaryView.swift         ← M13: finished day summary
+│       ├── PlayerPickerSheet.swift       ← squad/friends/guest roster picker (opened from ⋯ Add Players)
+│       └── Bracket*.swift                ← M21–M25 bracket "Tournaments" sub-tab (keeps "Tournament" naming)
 ├── Infrastructure/
 │   └── Camera/
 │       └── CameraManager.swift
@@ -313,8 +315,10 @@ squads/{squadId}
 squads/{squadId}/members/{userId}
 squads/{squadId}/plays/{playId}
 squads/{squadId}/plays/{playId}/reactions/{userId}
-squads/{squadId}/tournaments/{sessionId}                    # M10 / M13
-squads/{squadId}/tournaments/{sessionId}/matches/{matchId}  # M13
+squads/{squadId}/games/{gameId}                             # M10 / M13 (collection renamed from tournaments)
+squads/{squadId}/games/{gameId}/sessions/{sessionId}        # M13: day sessions within a game
+squads/{squadId}/games/{gameId}/sessions/{sessionId}/matches/{matchId}  # M13
+squads/{squadId}/games/{gameId}/brackets/{bracketId}        # M21–M25 bracket "Tournaments" sub-tab
 squads/{squadId}/leaderboard/{userId}                       # M10
 
 friendRequests/{requestId}                                  # M11; id = "fromUid_toUid"
