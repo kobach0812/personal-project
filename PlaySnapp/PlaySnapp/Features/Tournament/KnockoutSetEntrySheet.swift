@@ -55,7 +55,7 @@ struct KnockoutSetEntrySheet: View {
                     Text("Set \(nextSetNumber)")
                 } footer: {
                     if let validationError {
-                        Text(validationError).foregroundStyle(.red)
+                        Text(validationError).foregroundStyle(ThemeColor.loss)
                     } else {
                         Text("Enter this set's score. A draw is not allowed.")
                     }
@@ -63,6 +63,7 @@ struct KnockoutSetEntrySheet: View {
             }
             .navigationTitle("Enter Set")
             .navigationBarTitleDisplayMode(.inline)
+            .tint(ThemeColor.primary)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

@@ -42,6 +42,7 @@ struct ConfigureKnockoutSheet: View {
             }
             .navigationTitle("Configure Knockout")
             .navigationBarTitleDisplayMode(.inline)
+            .tint(ThemeColor.primary)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -76,12 +77,12 @@ struct ConfigureKnockoutSheet: View {
         } footer: {
             HStack(spacing: 6) {
                 Image(systemName: canGenerate ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(canGenerate ? .green : .orange)
+                    .foregroundStyle(canGenerate ? ThemeColor.accent : ThemeColor.loss)
                 Text("Total advancing: \(totalAdvancing)")
-                    .foregroundStyle(canGenerate ? Color.secondary : Color.orange)
+                    .foregroundStyle(canGenerate ? ThemeColor.textSecondary : ThemeColor.loss)
                 if !canGenerate {
                     Text("— must be 2–8")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(ThemeColor.loss)
                 }
             }
         }

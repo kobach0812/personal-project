@@ -12,6 +12,7 @@ struct BracketDetailView: View {
 
     var body: some View {
         content
+        .tint(ThemeColor.primary)
         .navigationTitle(bracket.title.isEmpty ? "Bracket" : bracket.title)
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -68,153 +69,13 @@ struct BracketDetailView: View {
                 setEntry = SetEntryContext(match: match)
             }
         } else {
-            List {
-                statusSection
-
-                if let live = vm.bracket {
-                    ForEach(live.groups) { group in
-                        GroupSection(
-                            group: group,
-                            vm: vm,
-                            onEnterScore: { match in
-                                scoreEntry = ScoreEntryContext(group: group, match: match)
-                            }
-                        )
-                    }
-                }
-
-                footerSection
-            }
-        }
-    }
-
-    // MARK: - Sections
-
-    @ViewBuilder
-    private var statusSection: some View {
-        Section {
-            HStack {
-                Image(systemName: vm.groupStageComplete ? "checkmark.circle.fill" : "circle.dashed")
-                    .foregroundStyle(vm.groupStageComplete ? .green : .secondary)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Group Stage")
-                        .font(.headline)
-                    Text("\(vm.groupMatchesPlayed) / \(vm.groupMatchesTotal) matches played")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var footerSection: some View {
-        if vm.groupStageComplete, vm.isOrganizer {
-            Section {
-                Button {
-                    showConfigureKnockout = true
-                } label: {
-                    HStack {
-                        Text("Configure Knockout")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } footer: {
-                Text("Pick how many teams advance from each group, then generate the knockout bracket.")
-            }
-        }
-    }
-}
-
-// MARK: - Group section
-
-private struct GroupSection: View {
-    let group: BracketGroup
-    @ObservedObject var vm: BracketDetailViewModel
-    let onEnterScore: (GroupMatch) -> Void
-
-    var body: some View {
-        Section {
-            // Standings table
-            ForEach(Array(vm.groupStandings(for: group).enumerated()), id: \.element.id) { idx, team in
-                HStack {
-                    Text("\(idx + 1).")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, alignment: .leading)
-                    Text(team.name)
-                        .font(.subheadline)
-                    Spacer()
-                    Text("\(vm.wins(team.id, in: group))–\(vm.losses(team.id, in: group))")
-                        .font(.subheadline.monospacedDigit())
-                    let diff = vm.pointDiff(team.id, in: group)
-                    Text(diff >= 0 ? "+\(diff)" : "\(diff)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(width: 40, alignment: .trailing)
-                }
-            }
-
-            // Matches
-            ForEach(group.matches) { match in
-                MatchRow(
-                    match: match,
-                    teamAName: vm.teamName(match.teamAID, in: group),
-                    teamBName: vm.teamName(match.teamBID, in: group),
-                    isOrganizer: vm.isOrganizer,
-                    onEnterScore: { onEnterScore(match) }
-                )
-            }
-        } header: {
-            Text("Group \(group.name)")
-        }
-    }
-}
-
-// MARK: - Match row
-
-private struct MatchRow: View {
-    let match: GroupMatch
-    let teamAName: String
-    let teamBName: String
-    let isOrganizer: Bool
-    let onEnterScore: () -> Void
-
-    var body: some View {
-        if let a = match.scoreA, let b = match.scoreB, match.winnerTeamID != nil {
-            HStack {
-                Text(teamAName)
-                    .fontWeight(match.winnerTeamID == match.teamAID ? .semibold : .regular)
-                Spacer()
-                Text("\(a) – \(b)")
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(teamBName)
-                    .fontWeight(match.winnerTeamID == match.teamBID ? .semibold : .regular)
-                    .multilineTextAlignment(.trailing)
-            }
-        } else if isOrganizer {
-            Button(action: onEnterScore) {
-                HStack {
-                    Text("\(teamAName) vs \(teamBName)")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text("Enter Score")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.tint)
-                }
-            }
-        } else {
-            HStack {
-                Text("\(teamAName) vs \(teamBName)")
-                Spacer()
-                Text("Awaiting result")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            BracketGroupStageView(
+                vm: vm,
+                onEnterScore: { group, match in
+                    scoreEntry = ScoreEntryContext(group: group, match: match)
+                },
+                onConfigureKnockout: { showConfigureKnockout = true }
+            )
         }
     }
 }

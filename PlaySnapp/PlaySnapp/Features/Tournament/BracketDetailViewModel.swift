@@ -50,6 +50,32 @@ final class BracketDetailViewModel: ObservableObject {
         group.teams.first { $0.id == id }?.name ?? id
     }
 
+    /// A team's record for the bento leader tile.
+    struct TeamRecord: Equatable {
+        let team: FixedTeam
+        let wins: Int
+        let losses: Int
+        let diff: Int
+    }
+
+    /// Best team across all groups (wins, then point diff). `nil` until at least one
+    /// group match has been played — the leader tile shows a placeholder until then.
+    var overallLeader: TeamRecord? {
+        guard let bracket else { return nil }
+        let records = bracket.groups.flatMap { group in
+            group.teams.map { team in
+                TeamRecord(team: team,
+                           wins: wins(team.id, in: group),
+                           losses: losses(team.id, in: group),
+                           diff: pointDiff(team.id, in: group))
+            }
+        }
+        guard records.contains(where: { $0.wins > 0 || $0.losses > 0 }) else { return nil }
+        return records.max { a, b in
+            a.wins != b.wins ? a.wins < b.wins : a.diff < b.diff
+        }
+    }
+
     func wins(_ teamID: String, in group: BracketGroup) -> Int {
         group.matches.filter { $0.winnerTeamID == teamID }.count
     }

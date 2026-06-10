@@ -48,7 +48,7 @@ struct GroupScoreEntrySheet: View {
                     Text("Score")
                 } footer: {
                     if let validationError {
-                        Text(validationError).foregroundStyle(.red)
+                        Text(validationError).foregroundStyle(ThemeColor.loss)
                     } else {
                         Text("Scores must be non-negative and a draw is not allowed.")
                     }
@@ -56,6 +56,7 @@ struct GroupScoreEntrySheet: View {
             }
             .navigationTitle("Enter Score")
             .navigationBarTitleDisplayMode(.inline)
+            .tint(ThemeColor.primary)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
