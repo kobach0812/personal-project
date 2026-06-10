@@ -74,7 +74,7 @@ private struct MainShellView: View {
                 }
                 .tag(MainTab.feed)
 
-            TournamentView()
+            GameView()
                 .tabItem {
                     Label("Game", systemImage: "sportscourt.fill")
                 }

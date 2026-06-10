@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ScheduledDayBanner: View {
-    let session: TournamentSession
+    let session: GameSession
     var onTap: () -> Void
 
     private var timeLabel: String {

@@ -106,38 +106,39 @@ struct FeedViewModelTests {
         // fetchNextScheduledSession is invoked via `try?`, so any error should
         // leave nextScheduledSession nil with no error message set.
         let vm = FeedViewModel()
-        let service = FailingTournamentService()
+        let service = FailingGameService()
 
-        await vm.loadNextScheduledSession(squadID: "sq1", tournamentService: service)
+        await vm.loadNextScheduledSession(squadID: "sq1", gameService: service)
 
         #expect(vm.nextScheduledSession == nil)
         #expect(vm.errorMessage == nil)
     }
 }
 
-// MARK: - Minimal failing TournamentService for the last test
+// MARK: - Minimal failing GameService for the last test
 
-private actor FailingTournamentService: TournamentServicing {
-    func createTournament(squadID: String, createdBy: String, title: String, players: [TournamentPlayer]) async throws -> Tournament { throw TestFailure.expected }
-    func fetchTournaments(squadID: String) async throws -> [Tournament] { throw TestFailure.expected }
-    func endTournament(_ tournament: Tournament) async throws { throw TestFailure.expected }
-    func addPlayers(_ newPlayers: [TournamentPlayer], to tournament: Tournament) async throws -> Tournament { throw TestFailure.expected }
-    func setTournamentRoster(_ players: [TournamentPlayer], for tournament: Tournament) async throws -> Tournament { throw TestFailure.expected }
-    func startDay(for tournament: Tournament, courts: Int, players: [TournamentPlayer], mode: SessionMode, fixedTeams: [FixedTeam]) async throws -> (Tournament, TournamentSession) { throw TestFailure.expected }
-    func endDay(_ session: TournamentSession, for tournament: Tournament) async throws -> Tournament { throw TestFailure.expected }
-    func fetchSessions(for tournament: Tournament) async throws -> [TournamentSession] { throw TestFailure.expected }
-    func fetchMatches(for session: TournamentSession) async throws -> [TournamentMatch] { throw TestFailure.expected }
-    nonisolated func observeSession(squadID: String, tournamentID: String, sessionID: String) -> AsyncStream<TournamentSession> { AsyncStream { $0.finish() } }
-    func generateNextRound(for session: TournamentSession) async throws -> TournamentSession { throw TestFailure.expected }
-    func recordResult(for session: TournamentSession, matchID: String, winner: WinnerTeam, scoreA: Int?, scoreB: Int?) async throws -> TournamentSession { throw TestFailure.expected }
-    func updatePlayers(_ players: [TournamentPlayer], for session: TournamentSession) async throws -> TournamentSession { throw TestFailure.expected }
-    func setSelfBench(playerID: String, isActive: Bool, for session: TournamentSession) async throws -> TournamentSession { throw TestFailure.expected }
-    func setFixedTeams(_ teams: [FixedTeam], for session: TournamentSession) async throws -> TournamentSession { throw TestFailure.expected }
-    func scheduleSession(for tournament: Tournament, title: String, scheduledStart: Date, courts: Int, location: String?) async throws -> TournamentSession { throw TestFailure.expected }
-    func cancelScheduledSession(_ session: TournamentSession) async throws -> TournamentSession { throw TestFailure.expected }
-    func startScheduledSession(_ session: TournamentSession, courts: Int, players: [TournamentPlayer]) async throws -> TournamentSession { throw TestFailure.expected }
-    func setRegistrationStatus(_ status: RegistrationStatus, userID: String, name: String, for session: TournamentSession) async throws { throw TestFailure.expected }
-    func checkInPlayer(userID: String, name: String, in session: TournamentSession) async throws -> TournamentSession { throw TestFailure.expected }
-    nonisolated func observeRegistrations(for session: TournamentSession) -> AsyncStream<[Registration]> { AsyncStream { $0.finish() } }
-    func fetchNextScheduledSession(squadID: String) async throws -> TournamentSession? { throw TestFailure.expected }
+private actor FailingGameService: GameServicing {
+    func createGame(squadID: String, createdBy: String, title: String, players: [GamePlayer]) async throws -> Game { throw TestFailure.expected }
+    func fetchGames(squadID: String) async throws -> [Game] { throw TestFailure.expected }
+    func endGame(_ game: Game) async throws { throw TestFailure.expected }
+    func addPlayers(_ newPlayers: [GamePlayer], to game: Game) async throws -> Game { throw TestFailure.expected }
+    func setGameRoster(_ players: [GamePlayer], for game: Game) async throws -> Game { throw TestFailure.expected }
+    func removePlayer(playerID: String, from game: Game) async throws -> Game { throw TestFailure.expected }
+    func startDay(for game: Game, courts: Int, players: [GamePlayer], mode: SessionMode, fixedTeams: [FixedTeam]) async throws -> (Game, GameSession) { throw TestFailure.expected }
+    func endDay(_ session: GameSession, for game: Game) async throws -> Game { throw TestFailure.expected }
+    func fetchSessions(for game: Game) async throws -> [GameSession] { throw TestFailure.expected }
+    func fetchMatches(for session: GameSession) async throws -> [GameMatch] { throw TestFailure.expected }
+    nonisolated func observeSession(squadID: String, gameID: String, sessionID: String) -> AsyncStream<GameSession> { AsyncStream { $0.finish() } }
+    func generateNextRound(for session: GameSession) async throws -> GameSession { throw TestFailure.expected }
+    func recordResult(for session: GameSession, matchID: String, winner: WinnerTeam, scoreA: Int?, scoreB: Int?) async throws -> GameSession { throw TestFailure.expected }
+    func updatePlayers(_ players: [GamePlayer], for session: GameSession) async throws -> GameSession { throw TestFailure.expected }
+    func setSelfBench(playerID: String, isActive: Bool, for session: GameSession) async throws -> GameSession { throw TestFailure.expected }
+    func setFixedTeams(_ teams: [FixedTeam], for session: GameSession) async throws -> GameSession { throw TestFailure.expected }
+    func scheduleSession(for game: Game, title: String, scheduledStart: Date, courts: Int, location: String?) async throws -> GameSession { throw TestFailure.expected }
+    func cancelScheduledSession(_ session: GameSession) async throws -> GameSession { throw TestFailure.expected }
+    func startScheduledSession(_ session: GameSession, courts: Int, players: [GamePlayer]) async throws -> GameSession { throw TestFailure.expected }
+    func setRegistrationStatus(_ status: RegistrationStatus, userID: String, name: String, for session: GameSession) async throws { throw TestFailure.expected }
+    func checkInPlayer(userID: String, name: String, in session: GameSession) async throws -> GameSession { throw TestFailure.expected }
+    nonisolated func observeRegistrations(for session: GameSession) -> AsyncStream<[Registration]> { AsyncStream { $0.finish() } }
+    func fetchNextScheduledSession(squadID: String) async throws -> GameSession? { throw TestFailure.expected }
 }

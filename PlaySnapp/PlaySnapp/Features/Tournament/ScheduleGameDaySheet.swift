@@ -4,8 +4,8 @@ struct ScheduleGameDaySheet: View {
     @EnvironmentObject private var env: AppEnvironment
     @Environment(\.dismiss) private var dismiss
 
-    let tournament: Tournament
-    var onScheduled: (TournamentSession) -> Void
+    let game: Game
+    var onScheduled: (GameSession) -> Void
 
     @State private var title = ""
     @State private var scheduledStart = Date.now.nextEveningRounded()
@@ -61,8 +61,8 @@ struct ScheduleGameDaySheet: View {
         errorMessage = nil
         defer { isScheduling = false }
         do {
-            let session = try await env.tournamentService.scheduleSession(
-                for: tournament,
+            let session = try await env.gameService.scheduleSession(
+                for: game,
                 title: title.trimmingCharacters(in: .whitespaces),
                 scheduledStart: scheduledStart,
                 courts: courts,

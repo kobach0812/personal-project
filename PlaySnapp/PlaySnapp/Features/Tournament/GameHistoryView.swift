@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct TournamentHistoryView: View {
-    let matches: [TournamentMatch]
+struct GameHistoryView: View {
+    let matches: [GameMatch]
     let playerName: (String) -> String
 
     var body: some View {
@@ -23,7 +23,7 @@ struct TournamentHistoryView: View {
 }
 
 private struct HistoryRow: View {
-    let match: TournamentMatch
+    let match: GameMatch
     let playerName: (String) -> String
 
     var body: some View {

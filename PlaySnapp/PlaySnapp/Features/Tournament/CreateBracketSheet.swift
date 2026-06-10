@@ -2,14 +2,14 @@ import SwiftUI
 
 // MARK: - CreateBracketSheet
 
-/// Host flow for creating a new bracket inside a parent Tournament.
+/// Host flow for creating a new bracket inside a parent Game.
 /// Steps in one screen: title → set up teams (reuses FixedTeamSetupSheet) →
 /// pick group count → assign each team to a group → Create.
 struct CreateBracketSheet: View {
     @EnvironmentObject private var env: AppEnvironment
     @Environment(\.dismiss) private var dismiss
 
-    let tournament: Tournament
+    let game: Game
     let createdBy: String
     var onCreated: (BracketTournament) -> Void
 
@@ -128,7 +128,7 @@ struct CreateBracketSheet: View {
             }
             .sheet(isPresented: $showTeamSetup) {
                 FixedTeamSetupSheet(
-                    players: tournament.players,
+                    players: game.players,
                     initialTeams: teams
                 ) { newTeams in
                     teams = newTeams
@@ -147,7 +147,7 @@ struct CreateBracketSheet: View {
 
     private func playerNames(for team: FixedTeam) -> String {
         team.playerIDs
-            .compactMap { id in tournament.players.first { $0.id == id }?.name }
+            .compactMap { id in game.players.first { $0.id == id }?.name }
             .joined(separator: " & ")
     }
 
@@ -172,8 +172,8 @@ struct CreateBracketSheet: View {
         defer { isCreating = false }
         do {
             let bracket = try await env.bracketTournamentService.createBracket(
-                in: tournament.id,
-                squadID: tournament.squadID,
+                in: game.id,
+                squadID: game.squadID,
                 createdBy: createdBy,
                 title: title.trimmingCharacters(in: .whitespaces),
                 groups: buildGroups()

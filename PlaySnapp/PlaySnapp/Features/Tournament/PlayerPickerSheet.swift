@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// Three-tab sheet for building a tournament roster from squad members, friends, or guest names.
+/// Three-tab sheet for building a game roster from squad members, friends, or guest names.
 struct PlayerPickerSheet: View {
     @EnvironmentObject private var env: AppEnvironment
     @Environment(\.dismiss) private var dismiss
 
     let squadMemberIDs: [String]
     /// Called with the final player list when the user taps Done.
-    var onConfirm: ([TournamentPlayer]) -> Void
+    var onConfirm: ([GamePlayer]) -> Void
 
     @State private var tab = 0
     @State private var squadUsers: [AppUser] = []
@@ -21,12 +21,12 @@ struct PlayerPickerSheet: View {
         selectedUserIDs.count + guests.count
     }
 
-    // Build TournamentPlayer list from current selections.
-    private func makePlayers() -> [TournamentPlayer] {
-        var result: [TournamentPlayer] = []
+    // Build GamePlayer list from current selections.
+    private func makePlayers() -> [GamePlayer] {
+        var result: [GamePlayer] = []
         // Squad members (prefer squad user over friend if same ID)
         for user in squadUsers where selectedUserIDs.contains(user.id) {
-            result.append(TournamentPlayer(
+            result.append(GamePlayer(
                 id: UUID().uuidString, name: user.name, userID: user.id,
                 played: 0, wins: 0, losses: 0, lastPlayedAt: 0, isActive: true
             ))
@@ -34,14 +34,14 @@ struct PlayerPickerSheet: View {
         // Friends not already added via squad
         let addedUserIDs = Set(result.compactMap(\.userID))
         for friend in friends where selectedUserIDs.contains(friend.id) && !addedUserIDs.contains(friend.id) {
-            result.append(TournamentPlayer(
+            result.append(GamePlayer(
                 id: UUID().uuidString, name: friend.name, userID: friend.id,
                 played: 0, wins: 0, losses: 0, lastPlayedAt: 0, isActive: true
             ))
         }
         // Guests (no linked user)
         for name in guests {
-            result.append(TournamentPlayer(
+            result.append(GamePlayer(
                 id: UUID().uuidString, name: name, userID: nil,
                 played: 0, wins: 0, losses: 0, lastPlayedAt: 0, isActive: true
             ))

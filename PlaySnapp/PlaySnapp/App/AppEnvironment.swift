@@ -16,7 +16,7 @@ final class AppEnvironment: ObservableObject {
     let storageService: StorageServicing
     let notificationService: NotificationServicing
     let widgetSyncService: WidgetSyncServicing
-    let tournamentService: TournamentServicing
+    let gameService: GameServicing
     let bracketTournamentService: BracketTournamentServicing
     let friendService: FriendServicing
 
@@ -29,7 +29,7 @@ final class AppEnvironment: ObservableObject {
         storageService: StorageServicing,
         notificationService: NotificationServicing,
         widgetSyncService: WidgetSyncServicing,
-        tournamentService: TournamentServicing,
+        gameService: GameServicing,
         bracketTournamentService: BracketTournamentServicing,
         friendService: FriendServicing
     ) {
@@ -41,7 +41,7 @@ final class AppEnvironment: ObservableObject {
         self.storageService = storageService
         self.notificationService = notificationService
         self.widgetSyncService = widgetSyncService
-        self.tournamentService = tournamentService
+        self.gameService = gameService
         self.bracketTournamentService = bracketTournamentService
         self.friendService = friendService
     }
@@ -71,7 +71,7 @@ extension AppEnvironment {
             storageService: StubStorageService(),
             notificationService: StubNotificationService(),
             widgetSyncService: LocalWidgetSyncService(),
-            tournamentService: StubTournamentService(),
+            gameService: StubGameService(),
             bracketTournamentService: StubBracketTournamentService(),
             friendService: StubFriendService(sessionStore: sessionStore)
         )
@@ -99,7 +99,7 @@ extension AppEnvironment {
             storageService: FirebaseStorageService(),
             notificationService: StubNotificationService(),
             widgetSyncService: LocalWidgetSyncService(),
-            tournamentService: FirebaseTournamentService(),
+            gameService: FirebaseGameService(),
             bracketTournamentService: FirebaseBracketTournamentService(),
             friendService: FirebaseFriendService(authGateway: authGateway)
         )

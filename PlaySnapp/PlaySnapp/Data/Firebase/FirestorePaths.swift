@@ -53,52 +53,52 @@ enum FirestorePaths {
         "friendRequests/\(requestID)"
     }
 
-    static func tournaments(_ squadID: String) -> String {
-        "\(squad(squadID))/tournaments"
+    static func games(_ squadID: String) -> String {
+        "\(squad(squadID))/games"
     }
 
-    static func tournament(_ squadID: String, _ tournamentID: String) -> String {
-        "\(tournaments(squadID))/\(tournamentID)"
+    static func game(_ squadID: String, _ gameID: String) -> String {
+        "\(games(squadID))/\(gameID)"
     }
 
-    // MARK: Day sessions within a tournament
+    // MARK: Day sessions within a game
 
-    static func tournamentSessions(_ squadID: String, _ tournamentID: String) -> String {
-        "\(tournament(squadID, tournamentID))/sessions"
+    static func gameSessions(_ squadID: String, _ gameID: String) -> String {
+        "\(game(squadID, gameID))/sessions"
     }
 
-    static func tournamentSession(_ squadID: String, _ tournamentID: String, _ sessionID: String) -> String {
-        "\(tournamentSessions(squadID, tournamentID))/\(sessionID)"
+    static func gameSession(_ squadID: String, _ gameID: String, _ sessionID: String) -> String {
+        "\(gameSessions(squadID, gameID))/\(sessionID)"
     }
 
     // MARK: Matches within a day session
 
-    static func sessionMatches(_ squadID: String, _ tournamentID: String, _ sessionID: String) -> String {
-        "\(tournamentSession(squadID, tournamentID, sessionID))/matches"
+    static func sessionMatches(_ squadID: String, _ gameID: String, _ sessionID: String) -> String {
+        "\(gameSession(squadID, gameID, sessionID))/matches"
     }
 
-    static func sessionMatch(_ squadID: String, _ tournamentID: String, _ sessionID: String, _ matchID: String) -> String {
-        "\(sessionMatches(squadID, tournamentID, sessionID))/\(matchID)"
+    static func sessionMatch(_ squadID: String, _ gameID: String, _ sessionID: String, _ matchID: String) -> String {
+        "\(sessionMatches(squadID, gameID, sessionID))/\(matchID)"
     }
 
     // MARK: Registrations within a day session
 
-    static func registrations(_ squadID: String, _ tournamentID: String, _ sessionID: String) -> String {
-        "\(tournamentSession(squadID, tournamentID, sessionID))/registrations"
+    static func registrations(_ squadID: String, _ gameID: String, _ sessionID: String) -> String {
+        "\(gameSession(squadID, gameID, sessionID))/registrations"
     }
 
-    static func registration(_ squadID: String, _ tournamentID: String, _ sessionID: String, _ userID: String) -> String {
-        "\(registrations(squadID, tournamentID, sessionID))/\(userID)"
+    static func registration(_ squadID: String, _ gameID: String, _ sessionID: String, _ userID: String) -> String {
+        "\(registrations(squadID, gameID, sessionID))/\(userID)"
     }
 
-    // MARK: Bracket tournaments within a parent tournament
+    // MARK: Bracket games within a parent game
 
-    static func brackets(_ squadID: String, _ tournamentID: String) -> String {
-        "\(tournament(squadID, tournamentID))/brackets"
+    static func brackets(_ squadID: String, _ gameID: String) -> String {
+        "\(game(squadID, gameID))/brackets"
     }
 
-    static func bracket(_ squadID: String, _ tournamentID: String, _ bracketID: String) -> String {
-        "\(brackets(squadID, tournamentID))/\(bracketID)"
+    static func bracket(_ squadID: String, _ gameID: String, _ bracketID: String) -> String {
+        "\(brackets(squadID, gameID))/\(bracketID)"
     }
 
     static func leaderboard(_ squadID: String) -> String {

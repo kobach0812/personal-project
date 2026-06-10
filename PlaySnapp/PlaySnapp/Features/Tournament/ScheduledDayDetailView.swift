@@ -5,7 +5,7 @@ import SwiftUI
 
 @MainActor
 final class ScheduledDayViewModel: ObservableObject {
-    @Published var session: TournamentSession
+    @Published var session: GameSession
     @Published var registrations: [Registration] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -14,7 +14,7 @@ final class ScheduledDayViewModel: ObservableObject {
     let currentUser: AppUser?
     let squadMemberIDs: [String]
 
-    init(session: TournamentSession, currentUser: AppUser?, squadMemberIDs: [String]) {
+    init(session: GameSession, currentUser: AppUser?, squadMemberIDs: [String]) {
         self.session = session
         self.currentUser = currentUser
         self.squadMemberIDs = squadMemberIDs
@@ -30,10 +30,10 @@ final class ScheduledDayViewModel: ObservableObject {
     var checkedInCount: Int { registrations.filter { $0.checkedInAt != nil }.count }
     var yesCount: Int { registrations.filter { $0.status == .yes }.count }
 
-    func startObserving(tournamentService: TournamentServicing) {
+    func startObserving(gameService: GameServicing) {
         observerTask?.cancel()
         observerTask = Task {
-            let stream = tournamentService.observeRegistrations(for: session)
+            let stream = gameService.observeRegistrations(for: session)
             for await regs in stream {
                 guard !Task.isCancelled else { break }
                 self.registrations = regs.sorted { $0.name < $1.name }
@@ -41,36 +41,36 @@ final class ScheduledDayViewModel: ObservableObject {
         }
     }
 
-    func setRSVP(_ status: RegistrationStatus, tournamentService: TournamentServicing) async {
+    func setRSVP(_ status: RegistrationStatus, gameService: GameServicing) async {
         guard let user = currentUser else { return }
         do {
-            try await tournamentService.setRegistrationStatus(status, userID: user.id, name: user.name, for: session)
+            try await gameService.setRegistrationStatus(status, userID: user.id, name: user.name, for: session)
         } catch {
             errorMessage = "Could not update RSVP."
         }
     }
 
-    func checkIn(userID: String, name: String, tournamentService: TournamentServicing) async {
+    func checkIn(userID: String, name: String, gameService: GameServicing) async {
         do {
-            session = try await tournamentService.checkInPlayer(userID: userID, name: name, in: session)
+            session = try await gameService.checkInPlayer(userID: userID, name: name, in: session)
         } catch {
             errorMessage = "Could not check in player."
         }
     }
 
-    /// Checked-in registrations converted to TournamentPlayer, ready to pre-populate the start sheet.
-    var checkedInPlayers: [TournamentPlayer] {
+    /// Checked-in registrations converted to GamePlayer, ready to pre-populate the start sheet.
+    var checkedInPlayers: [GamePlayer] {
         registrations
             .filter { $0.checkedInAt != nil }
-            .map { TournamentPlayer(id: UUID().uuidString, name: $0.name, userID: $0.userID,
+            .map { GamePlayer(id: UUID().uuidString, name: $0.name, userID: $0.userID,
                                    played: 0, wins: 0, losses: 0, lastPlayedAt: 0, isActive: true) }
     }
 
-    func startSession(courts: Int, players: [TournamentPlayer], tournamentService: TournamentServicing) async -> TournamentSession? {
+    func startSession(courts: Int, players: [GamePlayer], gameService: GameServicing) async -> GameSession? {
         isLoading = true
         defer { isLoading = false }
         do {
-            let active = try await tournamentService.startScheduledSession(session, courts: courts, players: players)
+            let active = try await gameService.startScheduledSession(session, courts: courts, players: players)
             session = active
             return active
         } catch {
@@ -79,9 +79,9 @@ final class ScheduledDayViewModel: ObservableObject {
         }
     }
 
-    func cancel(tournamentService: TournamentServicing) async {
+    func cancel(gameService: GameServicing) async {
         do {
-            session = try await tournamentService.cancelScheduledSession(session)
+            session = try await gameService.cancelScheduledSession(session)
         } catch {
             errorMessage = "Could not cancel session."
         }
@@ -93,12 +93,12 @@ final class ScheduledDayViewModel: ObservableObject {
 struct ScheduledDayDetailView: View {
     @EnvironmentObject private var env: AppEnvironment
     @StateObject private var vm: ScheduledDayViewModel
-    var onSessionStarted: (TournamentSession) -> Void
+    var onSessionStarted: (GameSession) -> Void
 
     @State private var showCancelConfirm = false
     @State private var showStartSheet = false
 
-    init(session: TournamentSession, currentUser: AppUser?, squadMemberIDs: [String], onSessionStarted: @escaping (TournamentSession) -> Void) {
+    init(session: GameSession, currentUser: AppUser?, squadMemberIDs: [String], onSessionStarted: @escaping (GameSession) -> Void) {
         _vm = StateObject(wrappedValue: ScheduledDayViewModel(session: session, currentUser: currentUser, squadMemberIDs: squadMemberIDs))
         self.onSessionStarted = onSessionStarted
     }
@@ -123,15 +123,15 @@ struct ScheduledDayDetailView: View {
                     HStack(spacing: 12) {
                         RSVPButton(label: "Going", systemImage: "checkmark.circle.fill", tint: .green,
                                    isSelected: vm.myRegistration?.status == .yes) {
-                            Task { await vm.setRSVP(.yes, tournamentService: env.tournamentService) }
+                            Task { await vm.setRSVP(.yes, gameService: env.gameService) }
                         }
                         RSVPButton(label: "Maybe", systemImage: "questionmark.circle.fill", tint: .orange,
                                    isSelected: vm.myRegistration?.status == .maybe) {
-                            Task { await vm.setRSVP(.maybe, tournamentService: env.tournamentService) }
+                            Task { await vm.setRSVP(.maybe, gameService: env.gameService) }
                         }
                         RSVPButton(label: "Can't go", systemImage: "xmark.circle.fill", tint: .red,
                                    isSelected: vm.myRegistration?.status == .no) {
-                            Task { await vm.setRSVP(.no, tournamentService: env.tournamentService) }
+                            Task { await vm.setRSVP(.no, gameService: env.gameService) }
                         }
                     }
                     .buttonStyle(.plain)
@@ -153,7 +153,7 @@ struct ScheduledDayDetailView: View {
                             if vm.isHost && vm.session.status == .scheduled {
                                 // Check-in toggle
                                 Button {
-                                    Task { await vm.checkIn(userID: reg.userID, name: reg.name, tournamentService: env.tournamentService) }
+                                    Task { await vm.checkIn(userID: reg.userID, name: reg.name, gameService: env.gameService) }
                                 } label: {
                                     Image(systemName: reg.checkedInAt != nil ? "checkmark.square.fill" : "square")
                                         .foregroundStyle(reg.checkedInAt != nil ? .orange : .secondary)
@@ -211,7 +211,7 @@ struct ScheduledDayDetailView: View {
         }
         .navigationTitle(vm.session.title.isEmpty ? "Game Day" : vm.session.title)
         .navigationBarTitleDisplayMode(.inline)
-        .task { vm.startObserving(tournamentService: env.tournamentService) }
+        .task { vm.startObserving(gameService: env.gameService) }
         .sheet(isPresented: $showStartSheet) {
             StartScheduledDaySheet(
                 session: vm.session,
@@ -220,7 +220,7 @@ struct ScheduledDayDetailView: View {
             ) { courts, players in
                 Task {
                     if let active = await vm.startSession(courts: courts, players: players,
-                                                         tournamentService: env.tournamentService) {
+                                                         gameService: env.gameService) {
                         onSessionStarted(active)
                     }
                 }
@@ -228,7 +228,7 @@ struct ScheduledDayDetailView: View {
         }
         .confirmationDialog("Cancel this game day?", isPresented: $showCancelConfirm, titleVisibility: .visible) {
             Button("Cancel Game Day", role: .destructive) {
-                Task { await vm.cancel(tournamentService: env.tournamentService) }
+                Task { await vm.cancel(gameService: env.gameService) }
             }
         } message: {
             Text("All registered players will see it as cancelled.")
@@ -269,17 +269,16 @@ struct StartScheduledDaySheet: View {
     @EnvironmentObject private var env: AppEnvironment
     @Environment(\.dismiss) private var dismiss
 
-    let session: TournamentSession
+    let session: GameSession
     let squadMemberIDs: [String]
-    var onStarted: (Int, [TournamentPlayer]) -> Void
+    var onStarted: (Int, [GamePlayer]) -> Void
 
     @State private var courts: Int
-    @State private var players: [TournamentPlayer]
+    @State private var players: [GamePlayer]
     @State private var selectedIDs: Set<String>
-    @State private var showPicker = false
 
-    init(session: TournamentSession, initialPlayers: [TournamentPlayer],
-         squadMemberIDs: [String], onStarted: @escaping (Int, [TournamentPlayer]) -> Void) {
+    init(session: GameSession, initialPlayers: [GamePlayer],
+         squadMemberIDs: [String], onStarted: @escaping (Int, [GamePlayer]) -> Void) {
         self.session = session
         self.squadMemberIDs = squadMemberIDs
         self.onStarted = onStarted
@@ -288,7 +287,7 @@ struct StartScheduledDaySheet: View {
         _selectedIDs = State(initialValue: Set(initialPlayers.map(\.id)))
     }
 
-    private var selectedPlayers: [TournamentPlayer] {
+    private var selectedPlayers: [GamePlayer] {
         players.filter { selectedIDs.contains($0.id) }
     }
 
@@ -309,9 +308,6 @@ struct StartScheduledDaySheet: View {
                                 else  { selectedIDs.remove(player.id) }
                             }
                         )
-                    }
-                    Button { showPicker = true } label: {
-                        Label("Add More Players", systemImage: "person.badge.plus")
                     }
                 } header: {
                     Text("Today's Players (\(selectedPlayers.count))")
@@ -336,23 +332,6 @@ struct StartScheduledDaySheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                }
-            }
-            .sheet(isPresented: $showPicker) {
-                PlayerPickerSheet(squadMemberIDs: squadMemberIDs) { newPlayers in
-                    let existingUserIDs = Set(players.compactMap(\.userID))
-                    let existingNames   = Set(players.filter { $0.userID == nil }.map(\.name))
-                    for p in newPlayers {
-                        if let uid = p.userID {
-                            if !existingUserIDs.contains(uid) {
-                                players.append(p); selectedIDs.insert(p.id)
-                            }
-                        } else {
-                            if !existingNames.contains(p.name) {
-                                players.append(p); selectedIDs.insert(p.id)
-                            }
-                        }
-                    }
                 }
             }
         }

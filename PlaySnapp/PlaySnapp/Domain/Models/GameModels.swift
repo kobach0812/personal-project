@@ -11,7 +11,7 @@ struct FixedTeam: Identifiable, Codable, Equatable, Hashable, Sendable {
     var playerIDs: [String] // exactly 2 for doubles
 }
 
-enum TournamentStatus: String, Codable, Sendable {
+enum GameStatus: String, Codable, Sendable {
     case scheduled
     case active
     case finished
@@ -23,7 +23,7 @@ enum WinnerTeam: String, Codable, Sendable {
     case teamB
 }
 
-struct TournamentPlayer: Identifiable, Codable, Equatable, Hashable, Sendable {
+struct GamePlayer: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     var name: String
     var userID: String?
@@ -39,7 +39,7 @@ struct TournamentPlayer: Identifiable, Codable, Equatable, Hashable, Sendable {
     var winRate: Double { played == 0 ? 0 : Double(wins) / Double(played) }
 }
 
-struct TournamentMatch: Identifiable, Codable, Equatable, Hashable, Sendable {
+struct GameMatch: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let court: Int
     let teamA: [String]
@@ -50,45 +50,45 @@ struct TournamentMatch: Identifiable, Codable, Equatable, Hashable, Sendable {
     var completedAt: Date?
 }
 
-// MARK: - Tournament (parent)
+// MARK: - Game (parent)
 
 /// Named series, e.g. "Tuesday Badminton". Contains one or many play days (sessions).
-struct Tournament: Identifiable, Codable, Hashable, Sendable {
+struct Game: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let squadID: String
     let createdBy: String
     let createdAt: Date
     var title: String
-    var status: TournamentStatus
+    var status: GameStatus
     /// Roster + cumulative stats that are summed when each day ends.
-    var players: [TournamentPlayer]
+    var players: [GamePlayer]
     /// ID of the currently active day session, if any.
     var activeDayID: String?
     /// Loaded on demand — NOT stored in Firestore.
-    var sessions: [TournamentSession]
+    var sessions: [GameSession]
 }
 
-// MARK: - TournamentSession (one play day)
+// MARK: - GameSession (one play day)
 
-/// One play day within a Tournament.
-struct TournamentSession: Identifiable, Codable, Hashable, Sendable {
+/// One play day within a Game.
+struct GameSession: Identifiable, Codable, Hashable, Sendable {
     let id: String
-    let tournamentID: String
+    let gameID: String
     let squadID: String
     let createdBy: String
     let createdAt: Date
     /// Display label for this day, e.g. "Day 3" or "Apr 24".
     var title: String
-    var status: TournamentStatus
+    var status: GameStatus
     var courts: Int
     /// Day-specific player stats + isActive flag for that day's rotation.
-    var players: [TournamentPlayer]
-    var currentRound: [TournamentMatch]
+    var players: [GamePlayer]
+    var currentRound: [GameMatch]
     var roundNumber: Int
     /// Monotonically increasing counter — incremented each time a match completes.
     var matchCounter: Int
     /// Completed matches, newest first. Populated from the Firestore `matches` subcollection on load.
-    var completedMatches: [TournamentMatch]
+    var completedMatches: [GameMatch]
     /// partnerships[playerID][partnerID] = count of times they've been on the same team.
     var partnerships: [String: [String: Int]]
     /// User IDs of all roster-added participants. Used for participant live-view.

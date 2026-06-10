@@ -1,9 +1,11 @@
 import SwiftUI
 
-struct TournamentBillboardView: View {
-    let players: [TournamentPlayer]
+struct GameBillboardView: View {
+    let players: [GamePlayer]
+    /// Non-nil for organizers — enables "Remove from Game" on each player row.
+    var onRemove: ((GamePlayer) -> Void)? = nil
 
-    private var sorted: [TournamentPlayer] {
+    private var sorted: [GamePlayer] {
         players.sorted {
             if $0.wins != $1.wins     { return $0.wins > $1.wins }
             if $0.losses != $1.losses { return $0.losses < $1.losses }
@@ -26,6 +28,14 @@ struct TournamentBillboardView: View {
                 } else {
                     ForEach(Array(sorted.enumerated()), id: \.element.id) { rank, player in
                         playerRow(rank: rank + 1, player: player)
+                            .contentShape(Rectangle())
+                            .contextMenu {
+                                if let onRemove {
+                                    Button(role: .destructive) { onRemove(player) } label: {
+                                        Label("Remove from Game", systemImage: "trash")
+                                    }
+                                }
+                            }
                         Divider().padding(.leading, 16)
                     }
                 }
@@ -48,7 +58,7 @@ struct TournamentBillboardView: View {
         .padding(.vertical, 8)
     }
 
-    private func playerRow(rank: Int, player: TournamentPlayer) -> some View {
+    private func playerRow(rank: Int, player: GamePlayer) -> some View {
         HStack {
             Text("\(rank). \(player.name)")
                 .frame(maxWidth: .infinity, alignment: .leading)

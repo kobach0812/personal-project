@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct TournamentSummaryView: View {
-    let session: TournamentSession
+struct GameSummaryView: View {
+    let session: GameSession
 
     private var duration: String? {
         guard let ended = session.endedAt else { return nil }

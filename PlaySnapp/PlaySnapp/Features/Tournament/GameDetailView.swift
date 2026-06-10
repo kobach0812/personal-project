@@ -1,32 +1,41 @@
 import SwiftUI
 
-// MARK: - TournamentDetailView (Board + Days tabs)
+// MARK: - GameDetailView (Board + Days tabs)
 
-struct TournamentDetailView: View {
+struct GameDetailView: View {
     @EnvironmentObject private var env: AppEnvironment
 
-    let initialTournament: Tournament
+    let initialGame: Game
     let currentUser: AppUser?
     let squadMemberIDs: [String]
 
-    @State private var tournament: Tournament
-    @State private var sessions: [TournamentSession] = []
+    @State private var game: Game
+    @State private var sessions: [GameSession] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var selectedTab = 0
     @State private var showStartDay = false
     @State private var showScheduleDay = false
+    @State private var showAddPlayers = false
     @State private var showEndConfirm = false
-    @State private var navigateToSession: TournamentSession?
+    @State private var navigateToSession: GameSession?
 
-    private var isOrganizer: Bool { tournament.createdBy == (currentUser?.id ?? "") }
-    private var hasActiveDay: Bool { tournament.activeDayID != nil }
+    private var isOrganizer: Bool { game.createdBy == (currentUser?.id ?? "") }
+    private var hasActiveDay: Bool { game.activeDayID != nil }
+    /// Organizer can manage the roster + create days only while the game is active.
+    private var canManageRoster: Bool { isOrganizer && game.status == .active }
 
-    init(tournament: Tournament, currentUser: AppUser?, squadMemberIDs: [String]) {
-        self.initialTournament = tournament
+    /// Board-tab delete handler — nil for non-organizers (hides the "Remove" action).
+    private var boardRemoveHandler: ((GamePlayer) -> Void)? {
+        guard canManageRoster else { return nil }
+        return { player in Task { await removePlayer(player) } }
+    }
+
+    init(game: Game, currentUser: AppUser?, squadMemberIDs: [String]) {
+        self.initialGame = game
         self.currentUser = currentUser
         self.squadMemberIDs = squadMemberIDs
-        _tournament = State(initialValue: tournament)
+        _game = State(initialValue: game)
     }
 
     var body: some View {
@@ -43,28 +52,23 @@ struct TournamentDetailView: View {
             Divider()
 
             switch selectedTab {
-            case 0:  TournamentBillboardView(players: tournament.players)
+            case 0:  GameBillboardView(players: game.players, onRemove: boardRemoveHandler)
             case 1:  daysListView
-            default: BracketListView(tournament: tournament, currentUser: currentUser)
+            default: BracketListView(game: game, currentUser: currentUser)
             }
         }
-        .navigationTitle(tournament.title.isEmpty ? "Tournament" : tournament.title)
+        .navigationTitle(game.title.isEmpty ? "Game" : game.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if isOrganizer && tournament.status == .active {
+            if isOrganizer && game.status == .active {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        if !hasActiveDay {
-                            Button { showStartDay = true } label: {
-                                Label("Start Walk-up Day", systemImage: "play.circle")
-                            }
-                        }
-                        Button { showScheduleDay = true } label: {
-                            Label("Schedule Game Day", systemImage: "calendar.badge.plus")
+                        Button { showAddPlayers = true } label: {
+                            Label("Add Players", systemImage: "person.badge.plus")
                         }
                         Divider()
                         Button(role: .destructive) { showEndConfirm = true } label: {
-                            Label("End Tournament", systemImage: "flag.checkered")
+                            Label("End Game", systemImage: "flag.checkered")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -77,25 +81,30 @@ struct TournamentDetailView: View {
         }
         .sheet(isPresented: $showStartDay) {
             StartDaySheet(
-                tournament: tournament,
+                game: game,
                 squadMemberIDs: squadMemberIDs
-            ) { newTournament, newSession in
-                self.tournament = newTournament
+            ) { newGame, newSession in
+                self.game = newGame
                 self.sessions.append(newSession)
                 self.navigateToSession = newSession
             }
         }
         .sheet(isPresented: $showScheduleDay) {
-            ScheduleGameDaySheet(tournament: tournament) { newSession in
+            ScheduleGameDaySheet(game: game) { newSession in
                 sessions.append(newSession)
             }
         }
-        .confirmationDialog("End Tournament?", isPresented: $showEndConfirm, titleVisibility: .visible) {
-            Button("End Tournament", role: .destructive) {
-                Task { await endTournament() }
+        .sheet(isPresented: $showAddPlayers) {
+            PlayerPickerSheet(squadMemberIDs: squadMemberIDs) { newPlayers in
+                Task { await addPlayers(newPlayers) }
+            }
+        }
+        .confirmationDialog("End Game?", isPresented: $showEndConfirm, titleVisibility: .visible) {
+            Button("End Game", role: .destructive) {
+                Task { await endGame() }
             }
         } message: {
-            Text("The tournament will be marked as finished. This cannot be undone.")
+            Text("The game will be marked as finished. This cannot be undone.")
         }
         .task { await loadSessions() }
         .onChange(of: navigateToSession) { old, new in
@@ -117,7 +126,7 @@ struct TournamentDetailView: View {
     // MARK: - Session destination router
 
     @ViewBuilder
-    private func sessionDestination(for session: TournamentSession) -> some View {
+    private func sessionDestination(for session: GameSession) -> some View {
         switch session.status {
         case .scheduled, .cancelled:
             ScheduledDayDetailView(
@@ -134,9 +143,9 @@ struct TournamentDetailView: View {
         case .active, .finished:
             DayDetailView(
                 session: session,
-                tournament: tournament,
+                game: game,
                 currentUser: currentUser,
-                onTournamentUpdated: { self.tournament = $0 }
+                onGameUpdated: { self.game = $0 }
             )
         }
     }
@@ -145,6 +154,37 @@ struct TournamentDetailView: View {
 
     @ViewBuilder
     private var daysListView: some View {
+        VStack(spacing: 0) {
+            if canManageRoster {
+                dayCreateBar
+                Divider()
+            }
+            daysContent
+        }
+    }
+
+    /// Organizer buttons to start or schedule a play day — moved here from the ⋯ menu.
+    private var dayCreateBar: some View {
+        HStack(spacing: 12) {
+            if !hasActiveDay {
+                Button { showStartDay = true } label: {
+                    Label("Walk-up Day", systemImage: "play.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            Button { showScheduleDay = true } label: {
+                Label("Schedule", systemImage: "calendar.badge.plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private var daysContent: some View {
         if isLoading {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if sessions.isEmpty {
@@ -152,7 +192,7 @@ struct TournamentDetailView: View {
                 "No days yet",
                 systemImage: "calendar.badge.plus",
                 description: Text(isOrganizer
-                    ? "Tap ⋯ to start or schedule a play day."
+                    ? "Start or schedule a play day using the buttons above."
                     : "No play days have been recorded yet.")
             )
         } else {
@@ -178,18 +218,34 @@ struct TournamentDetailView: View {
     private func loadSessions() async {
         isLoading = true
         defer { isLoading = false }
-        if let loaded = try? await env.tournamentService.fetchSessions(for: tournament) {
+        if let loaded = try? await env.gameService.fetchSessions(for: game) {
             sessions = loaded
         }
     }
 
-    private func endTournament() async {
+    private func addPlayers(_ newPlayers: [GamePlayer]) async {
         do {
-            try await env.tournamentService.endTournament(tournament)
-            tournament.status = .finished
-            tournament.activeDayID = nil
+            game = try await env.gameService.addPlayers(newPlayers, to: game)
         } catch {
-            errorMessage = "Could not end tournament."
+            errorMessage = "Could not add players."
+        }
+    }
+
+    private func removePlayer(_ player: GamePlayer) async {
+        do {
+            game = try await env.gameService.removePlayer(playerID: player.id, from: game)
+        } catch {
+            errorMessage = "Could not remove \(player.name)."
+        }
+    }
+
+    private func endGame() async {
+        do {
+            try await env.gameService.endGame(game)
+            game.status = .finished
+            game.activeDayID = nil
+        } catch {
+            errorMessage = "Could not end game."
         }
     }
 }
@@ -197,7 +253,7 @@ struct TournamentDetailView: View {
 // MARK: - Day row
 
 private struct DayRow: View {
-    let session: TournamentSession
+    let session: GameSession
 
     private var statusLabel: String {
         switch session.status {
@@ -265,39 +321,39 @@ private struct DayRow: View {
 struct DayDetailView: View {
     @EnvironmentObject private var env: AppEnvironment
 
-    let initialSession: TournamentSession
-    let initialTournament: Tournament
+    let initialSession: GameSession
+    let initialGame: Game
     let currentUser: AppUser?
-    var onTournamentUpdated: (Tournament) -> Void
+    var onGameUpdated: (Game) -> Void
 
-    @StateObject private var vm = TournamentViewModel()
+    @StateObject private var vm = GameViewModel()
 
     init(
-        session: TournamentSession,
-        tournament: Tournament,
+        session: GameSession,
+        game: Game,
         currentUser: AppUser?,
-        onTournamentUpdated: @escaping (Tournament) -> Void
+        onGameUpdated: @escaping (Game) -> Void
     ) {
         self.initialSession = session
-        self.initialTournament = tournament
+        self.initialGame = game
         self.currentUser = currentUser
-        self.onTournamentUpdated = onTournamentUpdated
+        self.onGameUpdated = onGameUpdated
     }
 
     var body: some View {
-        TournamentActiveView(vm: vm)
+        GameActiveView(vm: vm)
             .navigationTitle(initialSession.title.isEmpty ? "Day" : initialSession.title)
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 await vm.loadDay(
                     initialSession,
-                    tournament: initialTournament,
+                    game: initialGame,
                     currentUser: currentUser,
-                    tournamentService: env.tournamentService
+                    gameService: env.gameService
                 )
             }
-            .onChange(of: vm.tournament) { _, newTournament in
-                if let t = newTournament { onTournamentUpdated(t) }
+            .onChange(of: vm.game) { _, newGame in
+                if let t = newGame { onGameUpdated(t) }
             }
             .alert("Error", isPresented: Binding(
                 get: { vm.errorMessage != nil },
@@ -316,38 +372,35 @@ struct StartDaySheet: View {
     @EnvironmentObject private var env: AppEnvironment
     @Environment(\.dismiss) private var dismiss
 
-    let tournament: Tournament
+    let game: Game
     let squadMemberIDs: [String]
-    var onStarted: (Tournament, TournamentSession) -> Void
+    var onStarted: (Game, GameSession) -> Void
 
     @State private var courts = 1
     @State private var sessionMode: SessionMode = .rotation
     @State private var draftFixedTeams: [FixedTeam] = []
     @State private var showTeamSetup = false
-    /// Mutable local copy of the tournament roster — guest names can be edited inline.
-    @State private var rosterPlayers: [TournamentPlayer]
-    /// Players added this session via PlayerPickerSheet (not yet on the tournament roster).
-    @State private var extraPlayers: [TournamentPlayer] = []
+    /// Mutable local copy of the game roster — guest names can be edited inline.
+    @State private var rosterPlayers: [GamePlayer]
     @State private var selectedPlayerIDs: Set<String>
-    @State private var showPicker = false
     @State private var isStarting = false
     @State private var errorMessage: String?
 
     init(
-        tournament: Tournament,
+        game: Game,
         squadMemberIDs: [String],
-        onStarted: @escaping (Tournament, TournamentSession) -> Void
+        onStarted: @escaping (Game, GameSession) -> Void
     ) {
-        self.tournament = tournament
+        self.game = game
         self.squadMemberIDs = squadMemberIDs
         self.onStarted = onStarted
-        _rosterPlayers = State(initialValue: tournament.players)
-        _selectedPlayerIDs = State(initialValue: Set(tournament.players.map(\.id)))
+        _rosterPlayers = State(initialValue: game.players)
+        _selectedPlayerIDs = State(initialValue: Set(game.players.map(\.id)))
     }
 
-    private var allPlayers: [TournamentPlayer] { rosterPlayers + extraPlayers }
+    private var allPlayers: [GamePlayer] { rosterPlayers }
 
-    private var selectedPlayers: [TournamentPlayer] {
+    private var selectedPlayers: [GamePlayer] {
         allPlayers.filter { selectedPlayerIDs.contains($0.id) }
     }
 
@@ -408,7 +461,8 @@ struct StartDaySheet: View {
                 }
 
                 Section {
-                    // Existing roster — guests get an editable name field
+                    // Roster players — pick who's playing today. Add/remove players
+                    // from the game via the ⋯ menu on the game screen.
                     ForEach($rosterPlayers) { $player in
                         PlayerToggleRow(
                             player: $player,
@@ -418,20 +472,6 @@ struct StartDaySheet: View {
                                 else  { selectedPlayerIDs.remove(player.id) }
                             }
                         )
-                    }
-                    // Newly added players (all treated as guests until persisted)
-                    ForEach($extraPlayers) { $player in
-                        PlayerToggleRow(
-                            player: $player,
-                            isSelected: selectedPlayerIDs.contains(player.id),
-                            onToggle: { on in
-                                if on { selectedPlayerIDs.insert(player.id) }
-                                else  { selectedPlayerIDs.remove(player.id) }
-                            }
-                        )
-                    }
-                    Button { showPicker = true } label: {
-                        Label("Add More Players", systemImage: "person.badge.plus")
                     }
                 } header: {
                     Text("Today's Players (\(selectedPlayers.count))")
@@ -473,26 +513,6 @@ struct StartDaySheet: View {
                     draftFixedTeams = teams
                 }
             }
-            .sheet(isPresented: $showPicker) {
-                PlayerPickerSheet(squadMemberIDs: squadMemberIDs) { newPlayers in
-                    // Dedup against the current full roster
-                    let existingUserIDs = Set(allPlayers.compactMap(\.userID))
-                    let existingNames   = Set(allPlayers.filter { $0.userID == nil }.map(\.name))
-                    for p in newPlayers {
-                        if let uid = p.userID {
-                            if !existingUserIDs.contains(uid) {
-                                extraPlayers.append(p)
-                                selectedPlayerIDs.insert(p.id)
-                            }
-                        } else {
-                            if !existingNames.contains(p.name) {
-                                extraPlayers.append(p)
-                                selectedPlayerIDs.insert(p.id)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -502,11 +522,11 @@ struct StartDaySheet: View {
         defer { isStarting = false }
 
         // Full roster after edits: updated names + any newly added players
-        let finalRoster = rosterPlayers + extraPlayers
+        let finalRoster = rosterPlayers
 
         // Today's players: selected subset, daily stats reset
         let dayPlayers = selectedPlayers.map { p in
-            TournamentPlayer(
+            GamePlayer(
                 id: p.id, name: p.name, userID: p.userID,
                 played: 0, wins: 0, losses: 0, lastPlayedAt: 0,
                 isActive: true
@@ -515,15 +535,15 @@ struct StartDaySheet: View {
 
         do {
             // Persist roster changes (renamed guests + new additions) before starting the day
-            let updatedTournament = try await env.tournamentService.setTournamentRoster(
-                finalRoster, for: tournament
+            let updatedGame = try await env.gameService.setGameRoster(
+                finalRoster, for: game
             )
-            let (newTournament, session) = try await env.tournamentService.startDay(
-                for: updatedTournament, courts: courts, players: dayPlayers,
+            let (newGame, session) = try await env.gameService.startDay(
+                for: updatedGame, courts: courts, players: dayPlayers,
                 mode: sessionMode, fixedTeams: draftFixedTeams
             )
             dismiss()
-            onStarted(newTournament, session)
+            onStarted(newGame, session)
         } catch {
             errorMessage = "Could not start day."
         }
@@ -533,7 +553,7 @@ struct StartDaySheet: View {
 // MARK: - Player toggle row (used in StartDaySheet)
 
 struct PlayerToggleRow: View {
-    @Binding var player: TournamentPlayer
+    @Binding var player: GamePlayer
     let isSelected: Bool
     let onToggle: (Bool) -> Void
 

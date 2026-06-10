@@ -8,8 +8,8 @@ private func user(_ id: String) -> AppUser {
     AppUser(id: id, name: id, avatarURL: nil, activeSquadID: "sq1", createdAt: .now, updatedAt: .now)
 }
 
-private func tournament(createdBy: String) -> Tournament {
-    Tournament(
+private func game(createdBy: String) -> Game {
+    Game(
         id: "t1", squadID: "sq1", createdBy: createdBy,
         createdAt: .now, title: "Tuesday", status: .active,
         players: [], activeDayID: "s1", sessions: []
@@ -23,26 +23,26 @@ private func player(_ id: String,
                     wins: Int = 0,
                     losses: Int = 0,
                     lastPlayedAt: Int = 0,
-                    isActive: Bool = true) -> TournamentPlayer {
-    TournamentPlayer(
+                    isActive: Bool = true) -> GamePlayer {
+    GamePlayer(
         id: id, name: name ?? id, userID: userID,
         played: played, wins: wins, losses: losses,
         lastPlayedAt: lastPlayedAt, isActive: isActive
     )
 }
 
-private func match(_ id: String, court: Int, teamA: [String], teamB: [String]) -> TournamentMatch {
-    TournamentMatch(id: id, court: court, teamA: teamA, teamB: teamB, winnerTeam: nil)
+private func match(_ id: String, court: Int, teamA: [String], teamB: [String]) -> GameMatch {
+    GameMatch(id: id, court: court, teamA: teamA, teamB: teamB, winnerTeam: nil)
 }
 
 private func session(
-    players: [TournamentPlayer],
-    currentRound: [TournamentMatch] = [],
+    players: [GamePlayer],
+    currentRound: [GameMatch] = [],
     mode: SessionMode = .rotation,
     fixedTeams: [FixedTeam] = []
-) -> TournamentSession {
-    TournamentSession(
-        id: "s1", tournamentID: "t1", squadID: "sq1",
+) -> GameSession {
+    GameSession(
+        id: "s1", gameID: "t1", squadID: "sq1",
         createdBy: "host", createdAt: .now,
         title: "Day 1", status: .active,
         courts: 2, players: players,
@@ -58,34 +58,34 @@ private func session(
 // MARK: - Tests
 
 @MainActor
-struct TournamentViewModelTests {
+struct GameViewModelTests {
 
     @Test
-    func isOrganizer_trueWhenCurrentUserCreatedTournament() {
-        let vm = TournamentViewModel()
-        vm.tournament = tournament(createdBy: "alice")
+    func isOrganizer_trueWhenCurrentUserCreatedGame() {
+        let vm = GameViewModel()
+        vm.game = game(createdBy: "alice")
         vm.currentUser = user("alice")
         #expect(vm.isOrganizer)
     }
 
     @Test
     func isOrganizer_falseForOtherUser() {
-        let vm = TournamentViewModel()
-        vm.tournament = tournament(createdBy: "alice")
+        let vm = GameViewModel()
+        vm.game = game(createdBy: "alice")
         vm.currentUser = user("bob")
         #expect(!vm.isOrganizer)
     }
 
     @Test
-    func isOrganizer_falseWhenTournamentMissing() {
-        let vm = TournamentViewModel()
+    func isOrganizer_falseWhenGameMissing() {
+        let vm = GameViewModel()
         vm.currentUser = user("alice")
         #expect(!vm.isOrganizer)
     }
 
     @Test
     func participantBannerText_showsCourtNumberWhenUserOnCourt() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.currentUser = user("u1")
         vm.session = session(
             players: [player("p1", userID: "u1"), player("p2", userID: "u2"),
@@ -97,7 +97,7 @@ struct TournamentViewModelTests {
 
     @Test
     func participantBannerText_nilWhenUserNotOnCourt() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.currentUser = user("u1")
         vm.session = session(
             players: [player("p1", userID: "u1"), player("p2", userID: "u2"),
@@ -110,7 +110,7 @@ struct TournamentViewModelTests {
 
     @Test
     func billboardPlayers_sortsByWinsDescThenLossesAscThenName() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.session = session(players: [
             player("p1", name: "Bob",     wins: 2, losses: 1),
             player("p2", name: "Alice",   wins: 3, losses: 0),
@@ -124,7 +124,7 @@ struct TournamentViewModelTests {
 
     @Test
     func sittingOut_includesActivePlayersNotOnCourt() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.session = session(
             players: [
                 player("p1"), player("p2"), player("p3"), player("p4"),
@@ -139,7 +139,7 @@ struct TournamentViewModelTests {
 
     @Test
     func benched_includesOnlyInactivePlayers() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.session = session(players: [
             player("p1"),
             player("p2", isActive: false),
@@ -152,7 +152,7 @@ struct TournamentViewModelTests {
 
     @Test
     func myPlayer_returnsPlayerMatchingUserID() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.currentUser = user("u1")
         vm.session = session(players: [
             player("p1", userID: "u2"),
@@ -164,7 +164,7 @@ struct TournamentViewModelTests {
 
     @Test
     func myPlayerIsOnCourt_trueWhenAssigned() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.currentUser = user("u1")
         vm.session = session(
             players: [player("p1", userID: "u1"), player("p2", userID: "u2"),
@@ -176,7 +176,7 @@ struct TournamentViewModelTests {
 
     @Test
     func playerName_returnsIDWhenNotFound() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.session = session(players: [player("p1", name: "Alice")])
         #expect(vm.playerName("p1") == "Alice")
         #expect(vm.playerName("ghost") == "ghost")
@@ -184,7 +184,7 @@ struct TournamentViewModelTests {
 
     @Test
     func fixedTeamName_nilInRotationMode() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.session = session(
             players: [player("p1"), player("p2")],
             mode: .rotation,
@@ -195,7 +195,7 @@ struct TournamentViewModelTests {
 
     @Test
     func fixedTeamName_returnsTeamNameInFixedMode() {
-        let vm = TournamentViewModel()
+        let vm = GameViewModel()
         vm.session = session(
             players: [player("p1"), player("p2"), player("p3"), player("p4")],
             mode: .fixedTeams,

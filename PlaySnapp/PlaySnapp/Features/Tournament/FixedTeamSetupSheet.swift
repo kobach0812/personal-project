@@ -8,7 +8,7 @@ import SwiftUI
 struct FixedTeamSetupSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    let players: [TournamentPlayer]
+    let players: [GamePlayer]
     var initialTeams: [FixedTeam] = []
     var onSave: ([FixedTeam]) -> Void
 
@@ -17,15 +17,17 @@ struct FixedTeamSetupSheet: View {
 
     private var assignedIDs: Set<String> { Set(teams.flatMap { $0 }) }
 
-    private var unassigned: [TournamentPlayer] {
+    private var unassigned: [GamePlayer] {
         players.filter { !assignedIDs.contains($0.id) }
     }
 
+    /// Valid once there's at least one complete pair. Players left in the unassigned
+    /// pool are allowed — they simply sit out (not everyone in the game always plays).
     private var isValid: Bool {
-        !teams.isEmpty && teams.allSatisfy { $0.count == 2 } && unassigned.isEmpty
+        !teams.isEmpty && teams.allSatisfy { $0.count == 2 }
     }
 
-    init(players: [TournamentPlayer],
+    init(players: [GamePlayer],
          initialTeams: [FixedTeam] = [],
          onSave: @escaping ([FixedTeam]) -> Void) {
         self.players = players
@@ -69,6 +71,8 @@ struct FixedTeamSetupSheet: View {
                         }
                     } header: {
                         Text("Unassigned (\(unassigned.count))")
+                    } footer: {
+                        Text("Players left here aren't on a team and will sit this one out.")
                     }
                 }
 
@@ -154,7 +158,7 @@ struct FixedTeamSetupSheet: View {
 
     // MARK: - Actions
 
-    private func assign(_ player: TournamentPlayer) {
+    private func assign(_ player: GamePlayer) {
         // Find first team with an open slot
         if let idx = teams.firstIndex(where: { $0.count < 2 }) {
             teams[idx].append(player.id)
@@ -199,9 +203,6 @@ struct FixedTeamSetupSheet: View {
         let incompleteCount = teams.filter { $0.count < 2 }.count
         if incompleteCount > 0 {
             return "\(incompleteCount) team(s) still need a second player."
-        }
-        if !unassigned.isEmpty {
-            return "\(unassigned.count) player(s) not yet assigned to a team."
         }
         return ""
     }

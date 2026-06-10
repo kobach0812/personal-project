@@ -3,7 +3,7 @@ import SwiftUI
 struct FeedView: View {
     @EnvironmentObject private var environment: AppEnvironment
     @StateObject private var viewModel = FeedViewModel()
-    @State private var navigateToScheduledSession: TournamentSession?
+    @State private var navigateToScheduledSession: GameSession?
 
     private var isToday: Bool {
         guard let start = viewModel.nextScheduledSession?.scheduledStart else { return false }
@@ -73,7 +73,7 @@ struct FeedView: View {
                     if let squadID = try? await environment.squadService.fetchCurrentSquad()?.id {
                         await viewModel.loadNextScheduledSession(
                             squadID: squadID,
-                            tournamentService: environment.tournamentService
+                            gameService: environment.gameService
                         )
                     }
                 }

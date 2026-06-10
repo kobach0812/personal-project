@@ -3,19 +3,19 @@ import SwiftUI
 
 // MARK: - Entry point (Game tab)
 
-struct TournamentView: View {
+struct GameView: View {
     var body: some View {
         NavigationStack {
-            TournamentListView()
+            GameListView()
         }
     }
 }
 
-// MARK: - Tournament list ViewModel
+// MARK: - Game list ViewModel
 
 @MainActor
-final class TournamentListViewModel: ObservableObject {
-    @Published var tournaments: [Tournament] = []
+final class GameListViewModel: ObservableObject {
+    @Published var games: [Game] = []
     @Published var currentUser: AppUser?
     @Published var squad: Squad?
     @Published var isLoading = false
@@ -24,7 +24,7 @@ final class TournamentListViewModel: ObservableObject {
     func load(
         userProfileService: UserProfileServicing,
         squadService: SquadServicing,
-        tournamentService: TournamentServicing
+        gameService: GameServicing
     ) async {
         isLoading = true
         defer { isLoading = false }
@@ -34,20 +34,20 @@ final class TournamentListViewModel: ObservableObject {
         squad       = await fetchedSquad
         guard let squadID = squad?.id else { return }
         do {
-            tournaments = try await tournamentService.fetchTournaments(squadID: squadID)
+            games = try await gameService.fetchGames(squadID: squadID)
         } catch {
-            errorMessage = "Could not load tournaments."
+            errorMessage = "Could not load games."
         }
     }
 }
 
-// MARK: - Tournament list view
+// MARK: - Game list view
 
-struct TournamentListView: View {
+struct GameListView: View {
     @EnvironmentObject private var env: AppEnvironment
-    @StateObject private var vm = TournamentListViewModel()
+    @StateObject private var vm = GameListViewModel()
     @State private var showSetup = false
-    @State private var navigateTo: Tournament?
+    @State private var navigateTo: Game?
 
     var body: some View {
         listContent
@@ -58,15 +58,15 @@ struct TournamentListView: View {
                     Button { showSetup = true } label: { Image(systemName: "plus") }
                 }
             }
-            .navigationDestination(item: $navigateTo) { (tournament: Tournament) in
-                TournamentDetailView(
-                    tournament: tournament,
+            .navigationDestination(item: $navigateTo) { (game: Game) in
+                GameDetailView(
+                    game: game,
                     currentUser: vm.currentUser,
                     squadMemberIDs: vm.squad?.memberIDs ?? []
                 )
             }
             .sheet(isPresented: $showSetup) { setupSheet }
-            .task { await loadTournaments() }
+            .task { await loadGames() }
             .alert("Error", isPresented: Binding(
                 get: { vm.errorMessage != nil },
                 set: { if !$0 { vm.errorMessage = nil } }
@@ -81,17 +81,17 @@ struct TournamentListView: View {
     private var listContent: some View {
         if vm.isLoading {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if vm.tournaments.isEmpty {
+        } else if vm.games.isEmpty {
             ContentUnavailableView(
-                "No tournaments yet",
+                "No games yet",
                 systemImage: "sportscourt",
-                description: Text("Tap + to create your first tournament.")
+                description: Text("Tap + to create your first game.")
             )
         } else {
             List {
-                ForEach(vm.tournaments) { tournament in
-                    Button { navigateTo = tournament } label: {
-                        TournamentRow(tournament: tournament)
+                ForEach(vm.games) { game in
+                    Button { navigateTo = game } label: {
+                        GameRow(game: game)
                     }
                     .foregroundStyle(.primary)
                 }
@@ -100,39 +100,39 @@ struct TournamentListView: View {
     }
 
     private var setupSheet: some View {
-        TournamentSetupSheet(
+        GameSetupSheet(
             squadID: vm.squad?.id ?? "",
             createdBy: vm.currentUser?.id ?? "",
             squadMemberIDs: vm.squad?.memberIDs ?? []
-        ) { (newTournament: Tournament) in
-            vm.tournaments.insert(newTournament, at: 0)
+        ) { (newGame: Game) in
+            vm.games.insert(newGame, at: 0)
         }
     }
 
-    private func loadTournaments() async {
+    private func loadGames() async {
         await vm.load(
             userProfileService: env.userProfileService,
             squadService: env.squadService,
-            tournamentService: env.tournamentService
+            gameService: env.gameService
         )
     }
 }
 
-// MARK: - Tournament row
+// MARK: - Game row
 
-private struct TournamentRow: View {
-    let tournament: Tournament
+private struct GameRow: View {
+    let game: Game
 
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(tournament.status == .active ? Color.green : Color.secondary)
+                .fill(game.status == .active ? Color.green : Color.secondary)
                 .frame(width: 8, height: 8)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(tournament.title.isEmpty ? "Tournament" : tournament.title)
+                Text(game.title.isEmpty ? "Game" : game.title)
                     .font(.body)
-                Text("\(tournament.players.count) players")
+                Text("\(game.players.count) players")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -140,10 +140,10 @@ private struct TournamentRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(tournament.status == .active ? "Active" : "Finished")
+                Text(game.status == .active ? "Active" : "Finished")
                     .font(.caption.bold())
-                    .foregroundStyle(tournament.status == .active ? .green : .secondary)
-                if tournament.activeDayID != nil {
+                    .foregroundStyle(game.status == .active ? .green : .secondary)
+                if game.activeDayID != nil {
                     Text("Day in progress")
                         .font(.caption2)
                         .foregroundStyle(.orange)
@@ -154,19 +154,19 @@ private struct TournamentRow: View {
     }
 }
 
-// MARK: - Tournament creation sheet
+// MARK: - Game creation sheet
 
-struct TournamentSetupSheet: View {
+struct GameSetupSheet: View {
     @EnvironmentObject private var env: AppEnvironment
     @Environment(\.dismiss) private var dismiss
 
     let squadID: String
     let createdBy: String
     let squadMemberIDs: [String]
-    var onCreated: (Tournament) -> Void
+    var onCreated: (Game) -> Void
 
     @State private var title = ""
-    @State private var players: [TournamentPlayer] = []
+    @State private var players: [GamePlayer] = []
     @State private var showPicker = false
     @State private var isCreating = false
     @State private var errorMessage: String?
@@ -198,19 +198,19 @@ struct TournamentSetupSheet: View {
                 }
 
                 Section {
-                    Button("Create Tournament") { Task { await create() } }
+                    Button("Create Game") { Task { await create() } }
                         .frame(maxWidth: .infinity)
                         .disabled(!canCreate || isCreating)
                 }
             }
             .disabled(isCreating)
-            .navigationTitle("New Tournament")
+            .navigationTitle("New Game")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
             .sheet(isPresented: $showPicker) {
-                PlayerPickerSheet(squadMemberIDs: squadMemberIDs) { (newPlayers: [TournamentPlayer]) in
+                PlayerPickerSheet(squadMemberIDs: squadMemberIDs) { (newPlayers: [GamePlayer]) in
                     let existingIDs   = Set(players.compactMap(\.userID))
                     let existingNames = Set(players.filter { $0.userID == nil }.map(\.name))
                     for p in newPlayers {
@@ -227,24 +227,24 @@ struct TournamentSetupSheet: View {
         errorMessage = nil
         defer { isCreating = false }
         do {
-            let tournament = try await env.tournamentService.createTournament(
+            let game = try await env.gameService.createGame(
                 squadID: squadID,
                 createdBy: createdBy,
                 title: title.trimmingCharacters(in: .whitespaces),
                 players: players
             )
             dismiss()
-            onCreated(tournament)
+            onCreated(game)
         } catch {
-            errorMessage = "Could not create tournament."
+            errorMessage = "Could not create game."
         }
     }
 }
 
 // MARK: - Active day view container (Summary / Round / Board / History)
 
-struct TournamentActiveView: View {
-    @ObservedObject var vm: TournamentViewModel
+struct GameActiveView: View {
+    @ObservedObject var vm: GameViewModel
     @State private var selectedTab = 0
 
     private var isFinished: Bool { vm.session?.status == .finished }
@@ -277,12 +277,12 @@ struct TournamentActiveView: View {
             switch selectedTab {
             case 0:
                 if isFinished, let session = vm.session {
-                    TournamentSummaryView(session: session)
+                    GameSummaryView(session: session)
                 } else {
-                    TournamentRoundView(vm: vm)
+                    GameRoundView(vm: vm)
                 }
-            case 1:  TournamentBillboardView(players: vm.billboardPlayers)
-            default: TournamentHistoryView(
+            case 1:  GameBillboardView(players: vm.billboardPlayers)
+            default: GameHistoryView(
                         matches: vm.session?.completedMatches ?? [],
                         playerName: vm.playerName
                      )

@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct TournamentRoundView: View {
-    @ObservedObject var vm: TournamentViewModel
+struct GameRoundView: View {
+    @ObservedObject var vm: GameViewModel
     @EnvironmentObject private var env: AppEnvironment
     @State private var showManageTeams = false
 
@@ -38,7 +38,7 @@ struct TournamentRoundView: View {
                             isActive: myPlayer.isActive,
                             isOnCourt: vm.myPlayerIsOnCourt
                         ) {
-                            Task { await vm.selfBenchToggle(tournamentService: env.tournamentService) }
+                            Task { await vm.selfBenchToggle(gameService: env.gameService) }
                         }
                     }
 
@@ -57,7 +57,7 @@ struct TournamentRoundView: View {
                         .padding(.horizontal)
 
                         Button("End Day") {
-                            Task { await vm.endDay(tournamentService: env.tournamentService) }
+                            Task { await vm.endDay(gameService: env.gameService) }
                         }
                         .foregroundStyle(.red)
                         .padding(.bottom)
@@ -72,7 +72,7 @@ struct TournamentRoundView: View {
                     players: session.players,
                     initialTeams: session.fixedTeams
                 ) { teams in
-                    Task { await vm.setFixedTeams(teams, tournamentService: env.tournamentService) }
+                    Task { await vm.setFixedTeams(teams, gameService: env.gameService) }
                 }
             }
         }
@@ -82,8 +82,8 @@ struct TournamentRoundView: View {
 // MARK: - Match Card
 
 struct MatchCard: View {
-    let match: TournamentMatch
-    @ObservedObject var vm: TournamentViewModel
+    let match: GameMatch
+    @ObservedObject var vm: GameViewModel
     @EnvironmentObject private var env: AppEnvironment
     @State private var showResultSheet = false
 
@@ -146,8 +146,8 @@ struct MatchCard: View {
 // MARK: - Result Entry Sheet
 
 struct ResultEntrySheet: View {
-    let match: TournamentMatch
-    @ObservedObject var vm: TournamentViewModel
+    let match: GameMatch
+    @ObservedObject var vm: GameViewModel
     @EnvironmentObject private var env: AppEnvironment
     @Environment(\.dismiss) private var dismiss
 
@@ -203,7 +203,7 @@ struct ResultEntrySheet: View {
                             await vm.recordResult(
                                 matchID: match.id, winner: winner,
                                 scoreA: a, scoreB: b,
-                                tournamentService: env.tournamentService
+                                gameService: env.gameService
                             )
                         }
                     }
@@ -234,7 +234,7 @@ struct ResultEntrySheet: View {
 // MARK: - Player Status Card (sitting out + benched)
 
 struct PlayerStatusCard: View {
-    @ObservedObject var vm: TournamentViewModel
+    @ObservedObject var vm: GameViewModel
     @EnvironmentObject private var env: AppEnvironment
 
     var body: some View {
@@ -251,10 +251,10 @@ struct PlayerStatusCard: View {
                             if vm.isOrganizer {
                                 Menu {
                                     Button("Bench (skip rotation)") {
-                                        Task { await vm.benchPlayer(player.id, tournamentService: env.tournamentService) }
+                                        Task { await vm.benchPlayer(player.id, gameService: env.gameService) }
                                     }
                                     Button("Remove from day", role: .destructive) {
-                                        Task { await vm.removePlayer(player.id, tournamentService: env.tournamentService) }
+                                        Task { await vm.removePlayer(player.id, gameService: env.gameService) }
                                     }
                                 } label: {
                                     Image(systemName: "ellipsis.circle")
@@ -279,10 +279,10 @@ struct PlayerStatusCard: View {
                             if vm.isOrganizer {
                                 Menu {
                                     Button("Restore to rotation") {
-                                        Task { await vm.restorePlayer(player.id, tournamentService: env.tournamentService) }
+                                        Task { await vm.restorePlayer(player.id, gameService: env.gameService) }
                                     }
                                     Button("Remove from day", role: .destructive) {
-                                        Task { await vm.removePlayer(player.id, tournamentService: env.tournamentService) }
+                                        Task { await vm.removePlayer(player.id, gameService: env.gameService) }
                                     }
                                 } label: {
                                     Image(systemName: "ellipsis.circle")

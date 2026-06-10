@@ -2,9 +2,9 @@ import Combine
 import SwiftUI
 
 @MainActor
-final class TournamentViewModel: ObservableObject {
-    @Published var session: TournamentSession?
-    @Published var tournament: Tournament?
+final class GameViewModel: ObservableObject {
+    @Published var session: GameSession?
+    @Published var game: Game?
     @Published var currentUser: AppUser?
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -12,8 +12,8 @@ final class TournamentViewModel: ObservableObject {
     private var observerTask: Task<Void, Never>?
 
     var isOrganizer: Bool {
-        guard let tournament, let user = currentUser else { return false }
-        return tournament.createdBy == user.id
+        guard let game, let user = currentUser else { return false }
+        return game.createdBy == user.id
     }
 
     /// Non-nil when the current user has a linked player in the active round.
@@ -26,7 +26,7 @@ final class TournamentViewModel: ObservableObject {
         return "You're on Court \(match.court)"
     }
 
-    var billboardPlayers: [TournamentPlayer] {
+    var billboardPlayers: [GamePlayer] {
         guard let session else { return [] }
         return session.players.sorted {
             if $0.wins != $1.wins     { return $0.wins > $1.wins }
@@ -36,14 +36,14 @@ final class TournamentViewModel: ObservableObject {
     }
 
     /// Active players not currently assigned to any court.
-    var sittingOut: [TournamentPlayer] {
+    var sittingOut: [GamePlayer] {
         guard let session else { return [] }
         let activeIDs = Set(session.currentRound.flatMap { $0.teamA + $0.teamB })
         return session.players.filter { $0.isActive && !activeIDs.contains($0.id) }
     }
 
     /// Players benched by the organizer for this day.
-    var benched: [TournamentPlayer] {
+    var benched: [GamePlayer] {
         session?.players.filter { !$0.isActive } ?? []
     }
 
@@ -54,26 +54,26 @@ final class TournamentViewModel: ObservableObject {
     // MARK: - Loading
 
     func loadDay(
-        _ session: TournamentSession,
-        tournament: Tournament,
+        _ session: GameSession,
+        game: Game,
         currentUser: AppUser?,
-        tournamentService: TournamentServicing
+        gameService: GameServicing
     ) async {
         self.session     = session
-        self.tournament  = tournament
+        self.game  = game
         self.currentUser = currentUser
-        if let matches = try? await tournamentService.fetchMatches(for: session) {
+        if let matches = try? await gameService.fetchMatches(for: session) {
             self.session?.completedMatches = matches
         }
-        startObserving(session: session, tournamentService: tournamentService)
+        startObserving(session: session, gameService: gameService)
     }
 
-    private func startObserving(session: TournamentSession, tournamentService: TournamentServicing) {
+    private func startObserving(session: GameSession, gameService: GameServicing) {
         observerTask?.cancel()
         observerTask = Task {
-            let stream = tournamentService.observeSession(
+            let stream = gameService.observeSession(
                 squadID: session.squadID,
-                tournamentID: session.tournamentID,
+                gameID: session.gameID,
                 sessionID: session.id
             )
             for await fresh in stream {
@@ -90,10 +90,10 @@ final class TournamentViewModel: ObservableObject {
 
     // MARK: - Match actions
 
-    func recordResult(matchID: String, winner: WinnerTeam, scoreA: Int?, scoreB: Int?, tournamentService: TournamentServicing) async {
+    func recordResult(matchID: String, winner: WinnerTeam, scoreA: Int?, scoreB: Int?, gameService: GameServicing) async {
         guard let session else { return }
         do {
-            self.session = try await tournamentService.recordResult(
+            self.session = try await gameService.recordResult(
                 for: session, matchID: matchID, winner: winner, scoreA: scoreA, scoreB: scoreB
             )
         } catch {
@@ -103,13 +103,13 @@ final class TournamentViewModel: ObservableObject {
 
     // MARK: - Day lifecycle
 
-    func endDay(tournamentService: TournamentServicing) async {
-        guard let session, let tournament else { return }
+    func endDay(gameService: GameServicing) async {
+        guard let session, let game else { return }
         isLoading = true
         defer { isLoading = false }
         do {
-            let updated = try await tournamentService.endDay(session, for: tournament)
-            self.tournament = updated
+            let updated = try await gameService.endDay(session, for: game)
+            self.game = updated
             self.session?.status = .finished
         } catch {
             errorMessage = "Could not end day."
@@ -118,33 +118,33 @@ final class TournamentViewModel: ObservableObject {
 
     // MARK: - Player management (organizer only)
 
-    func benchPlayer(_ playerID: String, tournamentService: TournamentServicing) async {
+    func benchPlayer(_ playerID: String, gameService: GameServicing) async {
         guard var players = session?.players,
               let idx = players.firstIndex(where: { $0.id == playerID }) else { return }
         let onCourt = session?.currentRound.flatMap { $0.teamA + $0.teamB }.contains(playerID) ?? false
         guard !onCourt else { errorMessage = "Can't bench someone currently on court."; return }
         players[idx].isActive = false
-        await pushPlayerUpdate(players, tournamentService: tournamentService)
+        await pushPlayerUpdate(players, gameService: gameService)
     }
 
-    func restorePlayer(_ playerID: String, tournamentService: TournamentServicing) async {
+    func restorePlayer(_ playerID: String, gameService: GameServicing) async {
         guard var players = session?.players,
               let idx = players.firstIndex(where: { $0.id == playerID }) else { return }
         players[idx].isActive = true
-        await pushPlayerUpdate(players, tournamentService: tournamentService)
+        await pushPlayerUpdate(players, gameService: gameService)
     }
 
-    func removePlayer(_ playerID: String, tournamentService: TournamentServicing) async {
+    func removePlayer(_ playerID: String, gameService: GameServicing) async {
         guard let players = session?.players else { return }
         let onCourt = session?.currentRound.flatMap { $0.teamA + $0.teamB }.contains(playerID) ?? false
         guard !onCourt else { errorMessage = "Can't remove someone currently on court."; return }
-        await pushPlayerUpdate(players.filter { $0.id != playerID }, tournamentService: tournamentService)
+        await pushPlayerUpdate(players.filter { $0.id != playerID }, gameService: gameService)
     }
 
-    private func pushPlayerUpdate(_ players: [TournamentPlayer], tournamentService: TournamentServicing) async {
+    private func pushPlayerUpdate(_ players: [GamePlayer], gameService: GameServicing) async {
         guard let session else { return }
         do {
-            self.session = try await tournamentService.updatePlayers(players, for: session)
+            self.session = try await gameService.updatePlayers(players, for: session)
         } catch {
             errorMessage = "Could not update players."
         }
@@ -153,13 +153,13 @@ final class TournamentViewModel: ObservableObject {
     // MARK: - Participant self-actions
 
     /// Participant benches or restores themselves. Only valid when the player is not currently on court.
-    func selfBenchToggle(tournamentService: TournamentServicing) async {
+    func selfBenchToggle(gameService: GameServicing) async {
         guard let session, let user = currentUser,
               let myPlayer = session.players.first(where: { $0.userID == user.id }) else { return }
         let onCourt = session.currentRound.flatMap { $0.teamA + $0.teamB }.contains(myPlayer.id)
         guard !onCourt else { return }
         do {
-            self.session = try await tournamentService.setSelfBench(
+            self.session = try await gameService.setSelfBench(
                 playerID: myPlayer.id,
                 isActive: !myPlayer.isActive,
                 for: session
@@ -169,7 +169,7 @@ final class TournamentViewModel: ObservableObject {
         }
     }
 
-    var myPlayer: TournamentPlayer? {
+    var myPlayer: GamePlayer? {
         guard let session, let user = currentUser else { return nil }
         return session.players.first { $0.userID == user.id }
     }
@@ -188,10 +188,10 @@ final class TournamentViewModel: ObservableObject {
         return session.fixedTeams.first { Set($0.playerIDs) == set }?.name
     }
 
-    func setFixedTeams(_ teams: [FixedTeam], tournamentService: TournamentServicing) async {
+    func setFixedTeams(_ teams: [FixedTeam], gameService: GameServicing) async {
         guard let session else { return }
         do {
-            self.session = try await tournamentService.setFixedTeams(teams, for: session)
+            self.session = try await gameService.setFixedTeams(teams, for: session)
         } catch {
             errorMessage = "Could not save fixed teams."
         }

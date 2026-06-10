@@ -1,23 +1,23 @@
 import Foundation
 
-actor StubTournamentService: TournamentServicing {
-    private var tournaments: [Tournament] = []
+actor StubGameService: GameServicing {
+    private var games: [Game] = []
     private var registrations: [String: [Registration]] = [:]   // sessionID → registrations
 
-    // MARK: - Tournament lifecycle
+    // MARK: - Game lifecycle
 
-    func createTournament(squadID: String, createdBy: String, title: String, players: [TournamentPlayer]) async throws -> Tournament {
-        let t = Tournament(
+    func createGame(squadID: String, createdBy: String, title: String, players: [GamePlayer]) async throws -> Game {
+        let t = Game(
             id: UUID().uuidString, squadID: squadID, createdBy: createdBy,
             createdAt: .now, title: title, status: .active,
             players: players, activeDayID: nil, sessions: []
         )
-        tournaments.append(t)
+        games.append(t)
         return t
     }
 
-    func fetchTournaments(squadID: String) async throws -> [Tournament] {
-        tournaments
+    func fetchGames(squadID: String) async throws -> [Game] {
+        games
             .filter { $0.squadID == squadID }
             .sorted { lhs, rhs in
                 if (lhs.status == .active) != (rhs.status == .active) { return lhs.status == .active }
@@ -25,43 +25,50 @@ actor StubTournamentService: TournamentServicing {
             }
     }
 
-    func endTournament(_ tournament: Tournament) async throws {
-        var t = tournament
+    func endGame(_ game: Game) async throws {
+        var t = game
         t.status = .finished
-        upsertTournament(t)
+        upsertGame(t)
     }
 
     // MARK: - Roster management
 
-    func setTournamentRoster(_ players: [TournamentPlayer], for tournament: Tournament) async throws -> Tournament {
-        var t = tournament
+    func setGameRoster(_ players: [GamePlayer], for game: Game) async throws -> Game {
+        var t = game
         t.players = players
-        upsertTournament(t)
+        upsertGame(t)
         return t
     }
 
-    func addPlayers(_ newPlayers: [TournamentPlayer], to tournament: Tournament) async throws -> Tournament {
-        var t = tournament
+    func removePlayer(playerID: String, from game: Game) async throws -> Game {
+        var t = game
+        t.players.removeAll { $0.id == playerID }
+        upsertGame(t)
+        return t
+    }
+
+    func addPlayers(_ newPlayers: [GamePlayer], to game: Game) async throws -> Game {
+        var t = game
         let existingUserIDs = Set(t.players.compactMap(\.userID))
         let existingNames   = Set(t.players.filter { $0.userID == nil }.map(\.name))
         for p in newPlayers {
             if let uid = p.userID { if !existingUserIDs.contains(uid) { t.players.append(p) } }
             else                  { if !existingNames.contains(p.name)  { t.players.append(p) } }
         }
-        upsertTournament(t)
+        upsertGame(t)
         return t
     }
 
     // MARK: - Day / session lifecycle
 
-    func startDay(for tournament: Tournament, courts: Int, players: [TournamentPlayer],
-                  mode: SessionMode, fixedTeams: [FixedTeam]) async throws -> (Tournament, TournamentSession) {
-        let existingSessions = tournaments.first(where: { $0.id == tournament.id })?.sessions ?? []
-        var session = TournamentSession(
+    func startDay(for game: Game, courts: Int, players: [GamePlayer],
+                  mode: SessionMode, fixedTeams: [FixedTeam]) async throws -> (Game, GameSession) {
+        let existingSessions = games.first(where: { $0.id == game.id })?.sessions ?? []
+        var session = GameSession(
             id: UUID().uuidString,
-            tournamentID: tournament.id,
-            squadID: tournament.squadID,
-            createdBy: tournament.createdBy,
+            gameID: game.id,
+            squadID: game.squadID,
+            createdBy: game.createdBy,
             createdAt: .now,
             title: "Day \(existingSessions.count + 1)",
             status: .active,
@@ -80,65 +87,65 @@ actor StubTournamentService: TournamentServicing {
             fixedTeams: fixedTeams
         )
         session.currentRound = mode == .fixedTeams
-            ? TournamentRotationEngine.generateFixedTeamRound(session: session)
-            : TournamentRotationEngine.fillAllCourts(session: session)
+            ? GameRotationEngine.generateFixedTeamRound(session: session)
+            : GameRotationEngine.fillAllCourts(session: session)
 
-        var t = tournament
+        var t = game
         t.activeDayID = session.id
         t.sessions.append(session)
-        upsertTournament(t)
+        upsertGame(t)
         return (t, session)
     }
 
-    func endDay(_ session: TournamentSession, for tournament: Tournament) async throws -> Tournament {
+    func endDay(_ session: GameSession, for game: Game) async throws -> Game {
         var updatedSession = session
         updatedSession.status = .finished
         updatedSession.endedAt = .now
 
-        var t = tournament
+        var t = game
         t.activeDayID = nil
         t.players = mergeStats(into: t.players, from: session.players)
         upsertSession(updatedSession)
-        upsertTournament(t)
+        upsertGame(t)
         return t
     }
 
-    func fetchSessions(for tournament: Tournament) async throws -> [TournamentSession] {
-        tournaments.first(where: { $0.id == tournament.id })?.sessions ?? []
+    func fetchSessions(for game: Game) async throws -> [GameSession] {
+        games.first(where: { $0.id == game.id })?.sessions ?? []
     }
 
-    func fetchMatches(for session: TournamentSession) async throws -> [TournamentMatch] {
-        tournaments
-            .first(where: { $0.id == session.tournamentID })?
+    func fetchMatches(for session: GameSession) async throws -> [GameMatch] {
+        games
+            .first(where: { $0.id == session.gameID })?
             .sessions.first(where: { $0.id == session.id })?
             .completedMatches ?? []
     }
 
     // MARK: - In-session operations
 
-    nonisolated func observeSession(squadID: String, tournamentID: String, sessionID: String) -> AsyncStream<TournamentSession> {
+    nonisolated func observeSession(squadID: String, gameID: String, sessionID: String) -> AsyncStream<GameSession> {
         AsyncStream { continuation in continuation.finish() }
     }
 
-    func generateNextRound(for session: TournamentSession) async throws -> TournamentSession {
+    func generateNextRound(for session: GameSession) async throws -> GameSession {
         var updated = session
         updated.currentRound = session.mode == .fixedTeams
-            ? TournamentRotationEngine.generateFixedTeamRound(session: updated)
-            : TournamentRotationEngine.fillAllCourts(session: updated)
+            ? GameRotationEngine.generateFixedTeamRound(session: updated)
+            : GameRotationEngine.fillAllCourts(session: updated)
         upsertSession(updated)
         return updated
     }
 
-    func recordResult(for session: TournamentSession, matchID: String, winner: WinnerTeam, scoreA: Int?, scoreB: Int?) async throws -> TournamentSession {
+    func recordResult(for session: GameSession, matchID: String, winner: WinnerTeam, scoreA: Int?, scoreB: Int?) async throws -> GameSession {
         guard let match = session.currentRound.first(where: { $0.id == matchID }) else { return session }
 
         var updated = session
         updated.matchCounter += 1
-        updated.players = TournamentRotationEngine.applyResult(
+        updated.players = GameRotationEngine.applyResult(
             players: updated.players, match: match,
             winner: winner, matchCounter: updated.matchCounter
         )
-        updated.partnerships = TournamentRotationEngine.updatePartnerships(updated.partnerships, match: match)
+        updated.partnerships = GameRotationEngine.updatePartnerships(updated.partnerships, match: match)
 
         var archived = match
         archived.winnerTeam = winner; archived.teamAScore = scoreA
@@ -147,8 +154,8 @@ actor StubTournamentService: TournamentServicing {
 
         updated.currentRound.removeAll { $0.id == matchID }
         let nextMatch = updated.mode == .fixedTeams
-            ? TournamentRotationEngine.nextFixedTeamMatch(court: match.court, session: updated)
-            : TournamentRotationEngine.generateMatchForCourt(court: match.court, session: updated)
+            ? GameRotationEngine.nextFixedTeamMatch(court: match.court, session: updated)
+            : GameRotationEngine.generateMatchForCourt(court: match.court, session: updated)
         if let next = nextMatch {
             updated.currentRound.append(next)
         }
@@ -156,7 +163,7 @@ actor StubTournamentService: TournamentServicing {
         return updated
     }
 
-    func updatePlayers(_ players: [TournamentPlayer], for session: TournamentSession) async throws -> TournamentSession {
+    func updatePlayers(_ players: [GamePlayer], for session: GameSession) async throws -> GameSession {
         var updated = session
         updated.players = players
         upsertSession(updated)
@@ -165,9 +172,9 @@ actor StubTournamentService: TournamentServicing {
 
     // MARK: - Participant self-actions
 
-    func setSelfBench(playerID: String, isActive: Bool, for session: TournamentSession) async throws -> TournamentSession {
-        guard var players = tournaments
-            .first(where: { $0.id == session.tournamentID })?
+    func setSelfBench(playerID: String, isActive: Bool, for session: GameSession) async throws -> GameSession {
+        guard var players = games
+            .first(where: { $0.id == session.gameID })?
             .sessions.first(where: { $0.id == session.id })?
             .players,
               let idx = players.firstIndex(where: { $0.id == playerID })
@@ -178,7 +185,7 @@ actor StubTournamentService: TournamentServicing {
 
     // MARK: - Fixed teams
 
-    func setFixedTeams(_ teams: [FixedTeam], for session: TournamentSession) async throws -> TournamentSession {
+    func setFixedTeams(_ teams: [FixedTeam], for session: GameSession) async throws -> GameSession {
         var updated = session
         updated.mode = .fixedTeams
         updated.fixedTeams = teams
@@ -188,42 +195,42 @@ actor StubTournamentService: TournamentServicing {
 
     // MARK: - Scheduled day lifecycle
 
-    func scheduleSession(for tournament: Tournament, title: String, scheduledStart: Date, courts: Int, location: String?) async throws -> TournamentSession {
-        let session = TournamentSession(
-            id: UUID().uuidString, tournamentID: tournament.id, squadID: tournament.squadID,
-            createdBy: tournament.createdBy, createdAt: .now, title: title,
+    func scheduleSession(for game: Game, title: String, scheduledStart: Date, courts: Int, location: String?) async throws -> GameSession {
+        let session = GameSession(
+            id: UUID().uuidString, gameID: game.id, squadID: game.squadID,
+            createdBy: game.createdBy, createdAt: .now, title: title,
             status: .scheduled, courts: courts, players: [], currentRound: [],
             roundNumber: 0, matchCounter: 0, completedMatches: [], partnerships: [:],
             participantUserIDs: [], endedAt: nil, scheduledStart: scheduledStart, location: location,
             mode: .rotation, fixedTeams: []
         )
-        var t = tournament
+        var t = game
         t.sessions.append(session)
-        upsertTournament(t)
+        upsertGame(t)
         return session
     }
 
-    func cancelScheduledSession(_ session: TournamentSession) async throws -> TournamentSession {
+    func cancelScheduledSession(_ session: GameSession) async throws -> GameSession {
         var updated = session
         updated.status = .cancelled
         upsertSession(updated)
         return updated
     }
 
-    func startScheduledSession(_ session: TournamentSession, courts: Int, players: [TournamentPlayer]) async throws -> TournamentSession {
+    func startScheduledSession(_ session: GameSession, courts: Int, players: [GamePlayer]) async throws -> GameSession {
         var updated = session
         updated.status = .active
         updated.courts = courts
         updated.players = players
         updated.participantUserIDs = players.compactMap(\.userID)
-        updated.currentRound = TournamentRotationEngine.fillAllCourts(session: updated)
+        updated.currentRound = GameRotationEngine.fillAllCourts(session: updated)
         upsertSession(updated)
         return updated
     }
 
     // MARK: - RSVP
 
-    func setRegistrationStatus(_ status: RegistrationStatus, userID: String, name: String, for session: TournamentSession) async throws {
+    func setRegistrationStatus(_ status: RegistrationStatus, userID: String, name: String, for session: GameSession) async throws {
         var regs = registrations[session.id] ?? []
         if let idx = regs.firstIndex(where: { $0.id == userID }) {
             regs[idx].status = status
@@ -236,7 +243,7 @@ actor StubTournamentService: TournamentServicing {
 
     // MARK: - Check-in
 
-    func checkInPlayer(userID: String, name: String, in session: TournamentSession) async throws -> TournamentSession {
+    func checkInPlayer(userID: String, name: String, in session: GameSession) async throws -> GameSession {
         var regs = registrations[session.id] ?? []
         if let idx = regs.firstIndex(where: { $0.id == userID }) {
             regs[idx].checkedInAt = .now
@@ -248,7 +255,7 @@ actor StubTournamentService: TournamentServicing {
 
         // If session is active, immediately add to roster
         if session.status == .active {
-            let newPlayer = TournamentPlayer(id: UUID().uuidString, name: name, userID: userID,
+            let newPlayer = GamePlayer(id: UUID().uuidString, name: name, userID: userID,
                                              played: 0, wins: 0, losses: 0, lastPlayedAt: 0, isActive: true)
             var updated = session
             updated.players.append(newPlayer)
@@ -262,13 +269,13 @@ actor StubTournamentService: TournamentServicing {
         return session
     }
 
-    nonisolated func observeRegistrations(for session: TournamentSession) -> AsyncStream<[Registration]> {
+    nonisolated func observeRegistrations(for session: GameSession) -> AsyncStream<[Registration]> {
         AsyncStream { continuation in continuation.finish() }
     }
 
-    func fetchNextScheduledSession(squadID: String) async throws -> TournamentSession? {
+    func fetchNextScheduledSession(squadID: String) async throws -> GameSession? {
         let now = Date.now
-        let allSessions = tournaments
+        let allSessions = games
             .filter { $0.squadID == squadID }
             .flatMap { $0.sessions }
         let upcoming = allSessions.filter { session in
@@ -281,22 +288,22 @@ actor StubTournamentService: TournamentServicing {
 
     // MARK: - Private helpers
 
-    private func upsertTournament(_ t: Tournament) {
-        if let idx = tournaments.firstIndex(where: { $0.id == t.id }) { tournaments[idx] = t }
-        else { tournaments.append(t) }
+    private func upsertGame(_ t: Game) {
+        if let idx = games.firstIndex(where: { $0.id == t.id }) { games[idx] = t }
+        else { games.append(t) }
     }
 
-    private func upsertSession(_ session: TournamentSession) {
-        guard let ti = tournaments.firstIndex(where: { $0.id == session.tournamentID }) else { return }
-        if let si = tournaments[ti].sessions.firstIndex(where: { $0.id == session.id }) {
-            tournaments[ti].sessions[si] = session
+    private func upsertSession(_ session: GameSession) {
+        guard let ti = games.firstIndex(where: { $0.id == session.gameID }) else { return }
+        if let si = games[ti].sessions.firstIndex(where: { $0.id == session.id }) {
+            games[ti].sessions[si] = session
         } else {
-            tournaments[ti].sessions.append(session)
+            games[ti].sessions.append(session)
         }
     }
 
-    /// Adds day player stats into the tournament's cumulative roster, matched by userID or name.
-    private func mergeStats(into base: [TournamentPlayer], from day: [TournamentPlayer]) -> [TournamentPlayer] {
+    /// Adds day player stats into the game's cumulative roster, matched by userID or name.
+    private func mergeStats(into base: [GamePlayer], from day: [GamePlayer]) -> [GamePlayer] {
         var result = base
         for sp in day where sp.played > 0 {
             if let uid = sp.userID, let idx = result.firstIndex(where: { $0.userID == uid }) {

@@ -1,11 +1,14 @@
+import OSLog
 import SwiftUI
+
+private let bracketLog = Logger(subsystem: "PlaySnapp", category: "BracketList")
 
 // MARK: - BracketListView
 
 struct BracketListView: View {
     @EnvironmentObject private var env: AppEnvironment
 
-    let tournament: Tournament
+    let game: Game
     let currentUser: AppUser?
 
     @State private var brackets: [BracketTournament] = []
@@ -15,7 +18,7 @@ struct BracketListView: View {
     @State private var navigateTo: BracketTournament?
 
     private var isOrganizer: Bool {
-        tournament.createdBy == (currentUser?.id ?? "")
+        game.createdBy == (currentUser?.id ?? "")
     }
 
     var body: some View {
@@ -30,7 +33,7 @@ struct BracketListView: View {
                 }
             }
             .sheet(isPresented: $showCreate) {
-                CreateBracketSheet(tournament: tournament,
+                CreateBracketSheet(game: game,
                                    createdBy: currentUser?.id ?? "") { newBracket in
                     brackets.insert(newBracket, at: 0)
                 }
@@ -78,11 +81,14 @@ struct BracketListView: View {
         defer { isLoading = false }
         do {
             brackets = try await env.bracketTournamentService.fetchBrackets(
-                in: tournament.id,
-                squadID: tournament.squadID
+                in: game.id,
+                squadID: game.squadID
             )
         } catch {
-            errorMessage = "Could not load bracket tournaments."
+            // Surface the underlying Firestore error during diagnosis (e.g. "Missing or
+            // insufficient permissions." == security rules don't allow reading brackets).
+            bracketLog.error("fetchBrackets failed: \(error.localizedDescription, privacy: .public)")
+            errorMessage = "Could not load bracket tournaments.\n\n\(error.localizedDescription)"
         }
     }
 }
