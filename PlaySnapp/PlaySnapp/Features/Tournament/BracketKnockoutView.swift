@@ -563,9 +563,8 @@ private extension KnockoutRound {
 
 #if DEBUG
 /// Deterministic stub data so the bracket geometry can be eyeballed without running
-/// the full create → group → configure flow. Temporary preview scaffolding (also
-/// drives the snapshot test that renders the tree to a PNG).
-enum BracketPreviewData {
+/// the full create → group → configure flow. Drives the #Preview blocks below.
+private enum BracketPreviewData {
     static let groups: [BracketGroup] = [
         group("A", ["a1": "Falcons", "a2": "Hawks", "a3": "Owls", "a4": "Wrens"]),
         group("B", ["b1": "Bears", "b2": "Foxes", "b3": "Lynx", "b4": "Wolves"])
