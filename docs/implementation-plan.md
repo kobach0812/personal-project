@@ -1802,6 +1802,203 @@ Done when:
 
 ---
 
+### Milestone 26: Recap suite — weekly squad recap + game day recap ✅ IMPLEMENTED
+
+Status (2026-06-11): ✅ Implemented as specced — 85/85 unit tests green (17 new builder tests).
+Files landed: `SquadRecap` / `GameDayRecap` models, `SquadRecapBuilder` / `GameDayRecapBuilder` /
+`RecapImageRenderer` utilities, `Features/Recap/` (card views, sheets, view model, shared
+`RecapCardStyle`), wiring in `FeedView` (toolbar), `GameViewModel.endDay` + `DayDetailView`
+(auto-present day recap), `BracketKnockoutView` (champion transition).
+Remaining: manual on-device QA (end a real day → recap presents once → share → no re-present).
+
+Goal:
+- Two shareable recap cards rendered from existing data through one shared image pipeline:
+  1. **Weekly squad recap** — revives M15 as spec'd (plays, reactions, top play, top reactor over a rolling 7-day window).
+  2. **Game day recap** (new) — when a day of play ends or a bracket crowns a champion: match count, top performer, biggest scoreline, champion 🏆.
+
+Motivation:
+- Every share is *outbound* visibility — the only feature class that reaches non-users while push (M6) stays blocked. Recap cards double as the "screenshotable B2B marketing material" the design strategy calls for.
+- M15 was skipped when the only data was feed photos. Since then M10–M25 added matches, scores, standings, and champions — the game day recap is the stronger card now, and it reuses M15's render pipeline.
+
+Scope decisions (locked):
+- **Pure client-side derivation.** No new Firestore collections, no Cloud Functions (same as M15).
+- **One shared pipeline**: `RecapImageRenderer` wraps `ImageRenderer` → PNG → `ShareLink`. Both cards use it.
+- **Athletic Pro tokens.** Cards are built from `ThemeColor` / `ThemeTypography` / `SurfaceCard` / `ScoreText`. The champion variant is the one sanctioned use of Champion gold outside the M25 banner.
+- **Game day recap auto-presents** — once, on the organizer's device, when `endDay` succeeds; and when `BracketDetailViewModel.champion` transitions nil → non-nil. No persistent entry point in v1 (decided 2026-06-11; quiet button on `GameSummaryView` is a follow-up).
+- **Weekly recap entry**: toolbar button on `FeedView`, per the M15 spec. Window = last 7 days ending now, not calendar week.
+- **One canonical layout per card.** No themes, no customization.
+
+#### 26.1 Domain layer
+
+- `Domain/Models/SquadRecap.swift` — per M15 §15.1, with one deviation found at build time:
+  `topReactorName` → `topPosterName`. `Play.reactionSummary` is `[emoji: count]` and carries
+  no reactor identity, so the spec's sanctioned fallback ("top play poster") is the v1 field.
+- `Domain/Models/GameDayRecap.swift`:
+```swift
+struct GameDayRecap: Equatable {
+    let gameTitle: String
+    let date: Date
+    let playerCount: Int
+    let matchCount: Int
+    let topPerformerName: String?     // most wins that day; tie → most played → name
+    let biggestScoreline: String?     // e.g. "21–9", max |scoreA−scoreB| among scored matches
+    let championTeamName: String?     // set for the bracket-final variant
+}
+```
+
+#### 26.2 Shared utilities (pure, Tier 1 testable)
+
+- `Shared/Utilities/SquadRecapBuilder.swift` — per M15 §15.2.
+- `Shared/Utilities/GameDayRecapBuilder.swift` — `static func build(session: GameSession, matches: [GameMatch], champion: FixedTeam?) -> GameDayRecap`. Matches come from the existing `fetchMatches(for:)`.
+- `Shared/Utilities/RecapImageRenderer.swift` — `@MainActor` helper rendering any recap view at 1080×1920 @3x; returns `UIImage?`.
+
+#### 26.3 Feature layer
+
+New folder `Features/Recap/`:
+- `WeeklyRecapView.swift`, `WeeklyRecapSheet.swift`, `WeeklyRecapViewModel.swift` — per M15 §15.3.
+- `GameDayRecapView.swift`, `GameDayRecapSheet.swift` — card + sheet with `ShareLink`; champion variant swaps accent → gold and adds the trophy treatment.
+
+Edited files:
+- `Features/Feed/FeedView.swift` — toolbar recap button (sheet presentation only).
+- `Features/Tournament/GameViewModel.swift` — after `endDay` succeeds, build recap from the freshly fetched matches; expose `dayRecap: GameDayRecap?` to trigger the sheet. Skip when `matchCount == 0`.
+- `Features/Tournament/BracketKnockoutView.swift` (or `BracketDetailViewModel`) — present the champion recap once when `champion` becomes non-nil; guard against re-presenting on every reopen (`@AppStorage` seen-flag keyed by bracket ID, or only fire on the transition observed live).
+
+#### 26.4 Edge cases
+
+- Empty week → M15 empty state; no share button.
+- Day with zero completed matches → no auto-present.
+- Matches without scores (winner-only) → omit `biggestScoreline`.
+- Top performer tie → most played, then name (deterministic).
+- `ImageRenderer` returns nil → "Couldn't generate recap" + retry.
+
+#### 26.5 Build order
+
+1. `SquadRecapBuilder` + `GameDayRecapBuilder` + unit tests (fixtures: empty week, tie cases, scoreless matches).
+2. Card views iterated in Xcode previews with fixture data (both variants, both color schemes).
+3. `RecapImageRenderer` + `ShareLink` round-trip; verify PNG quality in Messages.
+4. Weekly wiring (FeedView toolbar).
+5. Day recap wiring (`endDay` success path), then champion variant.
+6. Manual QA: end a real day on device → recap appears once → share → reopen, no re-present.
+
+#### 26.6 Done when
+
+- Feed toolbar → weekly recap card summarizing the last 7 days; Share exports a high-res PNG.
+- Ending a day with ≥1 completed match auto-presents the day recap exactly once.
+- A bracket final completing presents the champion recap with gold treatment.
+- Builders fully covered by Tier 1 tests.
+
+#### 26.7 Out of scope / follow-ups
+
+- Persistent recap button on `GameSummaryView`.
+- Monthly / season recaps; year-in-review.
+- Auto-prompt via push (blocked on M6).
+- Animated (Stories-format) recap.
+
+---
+
+### Milestone 27: Play streaks 📋 PLANNED
+
+Goal:
+- Revive M16 exactly as spec'd: squad-level "🔥 N day streak" badge on the Feed, computed locally from the already-fetched feed. See M16 §16.1–16.8 for the full design — it remains accurate post-rename (Play/Feed naming unchanged).
+
+Deltas from the original M16 spec (2026-06-11):
+- Badge styling uses Athletic Pro tokens — flame on **Energy orange** (`ThemeColor`), `Badge` component from `Shared/Design/Components/`.
+- Cross-feature with M26: when `currentStreak >= 2`, the weekly recap card shows the streak line. One extra field on the card view; `StreakCalculator` is the shared source.
+- Test list per M16 §16.6 goes into `PlaySnappTests` (Swift Testing), alongside the existing engine suites.
+
+Done when: per M16 §16.7. Out of scope: per M16 §16.8 (per-user streaks, freezes, push nudges, milestone badges).
+
+---
+
+### Milestone 28: Mascot 📋 PLANNED (design-led, phased)
+
+Goal:
+- Introduce a brand mascot for retention moments — empty states, onboarding, celebrations — without undermining the Athletic Pro / B2B-credible direction.
+
+This resolves open question #4 in `docs/Design Ideas/design-ideas-EN.md` (answer: **yes**, phased).
+
+Hard constraints (from the design guide):
+- "Warmth without being childish" — Headspace / Strava-2023 illustration energy, not cartoon.
+- Sport-agnostic (squads span volleyball → badminton → pickup soccer).
+- Single line-weight illustration style so it folds into the existing Tier 4 plan — the mascot **becomes** the Tier 4.1 empty-state and Tier 4.2 onboarding illustrations rather than adding new asset scope.
+- No regional cultural coding.
+
+#### Phase 28a — Concept (design only, no code)
+
+- 2–3 character directions (silhouette, personality, working name), each shown in one empty-state mock and one celebration mock.
+- Founder picks one. Deliverable: concept sheet (Figma or PNG).
+
+#### Phase 28b — Static poses + empty-state integration
+
+- 6 poses: empty feed · no squad · no friends · no bracket · no notifications · generic error. Formats per the design guide (SVG preferred + PNG @2x @3x), into an asset catalog.
+- Code: new `Shared/Design/Components/EmptyStateView.swift` — image + headline + body + optional CTA, themable. Replace the `ContentUnavailableView` usages in `FeedView`, `GameView`, `GameDetailView`, `GameBillboardView`, `GameHistoryView`, `BracketListView`, `PlayerPickerSheet`, `NotificationsView`, `FriendsView` (audit found 11 call sites).
+- 3 onboarding hero panels for the first-launch flow (`WidgetIntroView` + onboarding screens).
+
+#### Phase 28c — Moments
+
+- Champion celebration: mascot + trophy illustration upgrading `ChampionBanner` (Tier 2.5), plus SwiftUI confetti (designer supplies colors only).
+- Streak nudge: small mascot variant beside the M27 badge when a streak is at risk.
+
+#### Phase 28d — Animation (deferred)
+
+- Lottie vs SwiftUI keyframes decided when 28c ships. Not before.
+
+Done when (per phase): 28a — direction picked. 28b — every empty state in the app shows the mascot via `EmptyStateView`; no `ContentUnavailableView` left on user-facing surfaces. 28c — bracket finale shows the celebration illustration.
+
+Out of scope: mascot in the widget (payload size), animated stickers, mascot-voiced copy system.
+
+---
+
+### Milestone 29: Career stats on Profile 📋 PLANNED
+
+Goal:
+- Surface per-squad career stats — games played, wins, losses, win rate — on the Profile tab.
+
+Motivation (from 2026-06-11 code audit):
+- `FirebaseGameService.recordResult` has been writing `squads/{squadID}/leaderboard/{userID}` (`totalPlayed` / `totalWins` / `totalLosses`) since M10 — but **no domain model and no read API exist**. The data is already accumulating; this milestone is mostly read-and-render.
+
+Scope decisions (locked):
+- **v1 is read-only** from the leaderboard collection. No new writes, no schema change.
+- **Per-squad, not cross-squad.** Stats shown for the active squad, with a per-squad breakdown for all memberships.
+- **Partner chemistry deferred.** `partnerships` is per-session; aggregating needs cross-session match scans or forward-only denormalization into leaderboard docs. Defer until demanded.
+
+#### 29.1 Domain layer
+
+- `LeaderboardEntry` model (in `GameModels.swift`): `userID`, `totalPlayed`, `totalWins`, `totalLosses`, computed `winRate`.
+- `GameServicing.fetchLeaderboard(squadID: String) async throws -> [LeaderboardEntry]`.
+
+#### 29.2 Data layer
+
+- `FirebaseGameService` — one-shot collection read of `leaderboard`; reuse the existing serializer fields from the write path.
+- `StubGameService` — canned entries for previews.
+
+#### 29.3 Feature layer
+
+- `Features/Profile/ProfileStatsSection.swift` — "Stats" card: Played / W / L / win-rate for the active squad (using `ScoreText` + `SurfaceCard`), expandable per-squad rows for other memberships.
+- `ProfileViewModel` — load stats concurrently with the existing profile + squads fetch.
+
+Stretch (gate on time): recent form — last 10 matches as W/L dots, from the newest sessions' `matches` subcollections.
+
+#### 29.4 Build order
+
+1. Model + protocol + stub + previews.
+2. Firebase read + verify numbers match the billboard "All time" expectations on a real squad.
+3. Profile UI section.
+
+#### 29.5 Done when
+
+- Profile shows real career numbers for the signed-in user in the active squad.
+- Per-squad breakdown lists every membership; squads with no games show a friendly zero state.
+- Stub-backed previews render without Firebase.
+
+#### 29.6 Out of scope / follow-ups
+
+- Cross-squad aggregate totals; charts/graphs.
+- Partner chemistry; head-to-head records.
+- Achievements/badges (future milestone — natural mascot tie-in).
+
+---
+
 ## 6. Recommended acceptance checks
 
 Run these after each major milestone:

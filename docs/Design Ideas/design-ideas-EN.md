@@ -254,11 +254,10 @@ Before final design, confirm these:
 1. **Localization scope**: Vietnamese-only? English-only? Both? Affects typography choices for diacritics.
 2. **B2B contract specifics**: Will there be white-label deployments? If yes, tokens architecture is non-negotiable.
 3. **Custom font budget**: SF Pro Rounded (free) covers Mood 1 sufficiently, but if there's budget for ~$200–500, a paid display font (e.g., Tobias, Söhne) could elevate the brand significantly.
-4. **Mascot character**: Worth considering for long-term retention but slow to develop (think Duo from Duolingo). Yes/no?
-
 ### Resolved
 
 - **App name**: confirmed as **PlaySnapp** (two Ps). The AuthView source code currently shows "PlaySnap" (one P) — a typo that needs fixing in code.
+- **Mascot character**: **yes** — greenlit 2026-06-11 as a phased, design-led milestone (concept → static poses → celebration moments → animation). See `docs/implementation-plan.md` Milestone 28. The mascot absorbs the Tier 4.1 empty-state and Tier 4.2 onboarding illustration scope rather than adding to it.
 
 ---
 

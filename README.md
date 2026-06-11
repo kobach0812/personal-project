@@ -107,6 +107,8 @@ MVP milestones M0–M25 are complete or intentionally skipped:
 | M17 | Participant self‑actions | 🔶 self‑bench done; score correction deferred |
 | M18–M20 | Scheduled days + RSVP, tab refactor, fixed teams | ✅ |
 | M21–M25 | Bracket "Tournaments" — group stage → knockout | ✅ |
+| M26 | Recap suite — weekly + game day share cards | ✅ |
+| M27–M29 | Play streaks, mascot, career stats | 📋 planned |
 
 ## Documentation
 

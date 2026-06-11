@@ -255,7 +255,9 @@ Trước khi finalize thiết kế, confirm những điều sau:
 2. **Phạm vi localization**: Chỉ tiếng Việt? Chỉ tiếng Anh? Cả hai? Ảnh hưởng đến lựa chọn typography cho dấu tiếng Việt.
 3. **Chi tiết hợp đồng B2B**: Có triển khai white-label không? Nếu có, kiến trúc tokens là bắt buộc.
 4. **Ngân sách font custom**: SF Pro Rounded (miễn phí) đủ cho Mood 1, nhưng nếu có ngân sách ~$200–500, một display font trả phí (ví dụ Tobias, Söhne) có thể nâng tầm brand đáng kể.
-5. **Linh vật mascot**: Đáng cân nhắc cho retention dài hạn nhưng phát triển chậm (như Duo của Duolingo). Có / không?
+### Đã chốt
+
+- **Linh vật mascot**: **có** — duyệt ngày 2026-06-11, triển khai theo từng giai đoạn do thiết kế dẫn dắt (concept → pose tĩnh → khoảnh khắc ăn mừng → animation). Xem `docs/implementation-plan.md` Milestone 28. Mascot gánh luôn phần minh họa empty-state (Tier 4.1) và onboarding (Tier 4.2), không phát sinh thêm khối lượng asset mới.
 
 ---
 
