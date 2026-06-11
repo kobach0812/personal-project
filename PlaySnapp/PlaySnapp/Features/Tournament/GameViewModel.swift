@@ -8,6 +8,9 @@ final class GameViewModel: ObservableObject {
     @Published var currentUser: AppUser?
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// Set once when a day with at least one completed match ends; drives the
+    /// auto-presented recap sheet (M26).
+    @Published var dayRecap: GameDayRecap?
 
     private var observerTask: Task<Void, Never>?
 
@@ -111,6 +114,10 @@ final class GameViewModel: ObservableObject {
             let updated = try await gameService.endDay(session, for: game)
             self.game = updated
             self.session?.status = .finished
+            let matches = (try? await gameService.fetchMatches(for: session)) ?? session.completedMatches
+            if !matches.isEmpty {
+                dayRecap = GameDayRecapBuilder.build(session: session, matches: matches)
+            }
         } catch {
             errorMessage = "Could not end day."
         }

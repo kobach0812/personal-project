@@ -363,6 +363,9 @@ struct DayDetailView: View {
             } message: {
                 Text(vm.errorMessage ?? "")
             }
+            .sheet(item: $vm.dayRecap) { recap in
+                GameDayRecapSheet(recap: recap)
+            }
     }
 }
 

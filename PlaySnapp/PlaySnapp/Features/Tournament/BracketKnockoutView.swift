@@ -9,6 +9,11 @@ struct BracketKnockoutView: View {
     @ObservedObject var vm: BracketDetailViewModel
     let onEnterSet: (KnockoutMatch) -> Void
 
+    /// Set when the champion is crowned while this view is open — drives the
+    /// auto-presented champion recap (M26). Reopening a finished bracket does
+    /// not re-present because only the live nil → champion transition fires.
+    @State private var championRecap: GameDayRecap?
+
     /// Left→right column order, widest round first.
     private static let columnOrder: [KnockoutRound] = [.quarterfinal, .semifinal, .final]
 
@@ -61,6 +66,13 @@ struct BracketKnockoutView: View {
             .padding(.vertical, ThemeSpacing.xl)
         }
         .background(ThemeColor.surface)
+        .onChange(of: vm.champion) { previous, crowned in
+            guard previous == nil, let crowned, let bracket = vm.bracket else { return }
+            championRecap = GameDayRecapBuilder.build(bracket: bracket, champion: crowned)
+        }
+        .sheet(item: $championRecap) { recap in
+            GameDayRecapSheet(recap: recap)
+        }
     }
 
     // MARK: - Horizontal bracket tree

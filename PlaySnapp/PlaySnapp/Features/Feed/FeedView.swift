@@ -4,6 +4,7 @@ struct FeedView: View {
     @EnvironmentObject private var environment: AppEnvironment
     @StateObject private var viewModel = FeedViewModel()
     @State private var navigateToScheduledSession: GameSession?
+    @State private var showWeeklyRecap = false
 
     private var isToday: Bool {
         guard let start = viewModel.nextScheduledSession?.scheduledStart else { return false }
@@ -67,6 +68,19 @@ struct FeedView: View {
                 }
             }
             .navigationTitle("Squad feed")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showWeeklyRecap = true
+                    } label: {
+                        Image(systemName: "chart.bar.doc.horizontal")
+                    }
+                    .accessibilityLabel("Weekly recap")
+                }
+            }
+            .sheet(isPresented: $showWeeklyRecap) {
+                WeeklyRecapSheet()
+            }
             .onAppear {
                 Task {
                     await viewModel.load(playService: environment.playService)
