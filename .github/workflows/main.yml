@@ -1,0 +1,35 @@
+# .github/workflows/ci.yml
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-26                     # image with the iOS 26 SDK
+    steps:
+      - uses: actions/checkout@v4
+
+      # GoogleService-Info.plist is git-ignored — CI must supply one
+      - name: Inject Firebase config
+        run: |
+          echo "$GOOGLE_SERVICE_INFO_B64" | base64 -d \
+            > PlaySnapp/PlaySnapp/GoogleService-Info.plist
+        env:
+          GOOGLE_SERVICE_INFO_B64: ${{ secrets.GOOGLE_SERVICE_INFO_B64 }}
+
+      - name: Cache SPM packages
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ hashFiles('**/Package.resolved') }}
+
+      - name: Run unit tests
+        run: |
+          xcodebuild test \
+            -project PlaySnapp/PlaySnapp.xcodeproj \
+            -scheme PlaySnapp \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            -only-testing:PlaySnappTests \
+            CODE_SIGNING_ALLOWED=NO
