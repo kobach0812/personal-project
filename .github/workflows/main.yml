@@ -11,11 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # GoogleService-Info.plist is git-ignored — CI must supply one
+      # GoogleService-Info.plist is git-ignored — CI must supply it at the
+      # path the Xcode project references (next to the .xcodeproj). Writing it
+      # inside PlaySnapp/PlaySnapp/ would be auto-picked-up by the synced group
+      # and collide with the project's file reference ("Multiple commands produce").
       - name: Inject Firebase config
         run: |
           echo "$GOOGLE_SERVICE_INFO_B64" | base64 -d \
-            > PlaySnapp/PlaySnapp/GoogleService-Info.plist
+            > PlaySnapp/GoogleService-Info.plist
         env:
           GOOGLE_SERVICE_INFO_B64: ${{ secrets.GOOGLE_SERVICE_INFO_B64 }}
 
